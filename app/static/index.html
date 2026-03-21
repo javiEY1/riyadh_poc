@@ -613,7 +613,7 @@
       </section>
 
       <section class="card">
-        <details>
+        <details data-accordion="main">
           <summary>Contract Templates</summary>
           <div class="tpl-controls">
             <input type="text" id="tplNameInput" placeholder="Template name (optional)" />
@@ -648,7 +648,7 @@
       </section>
 
       <section class="card">
-        <details>
+        <details data-accordion="main">
           <summary>Document History</summary>
           <ul class="history-list" id="historyList">
             <li style="color:var(--ra-muted);cursor:default">No documents yet.</li>
@@ -1031,6 +1031,16 @@
         if (e.key === "Escape" && compareModal.classList.contains("open")) closeCompareModal();
       });
 
+      document.querySelectorAll("details[data-accordion]").forEach(det => {
+        det.addEventListener("toggle", () => {
+          if (!det.open) return;
+          const group = det.dataset.accordion;
+          document.querySelectorAll(`details[data-accordion="${group}"]`).forEach(other => {
+            if (other !== det && other.open) other.open = false;
+          });
+        });
+      });
+
       function renderTableInto(tbody, confRows, evidenceRows) {
         tbody.innerHTML = "";
         if (!confRows || !confRows.length) return;
@@ -1042,18 +1052,23 @@
           if (!grouped[l1][row.section]) grouped[l1][row.section] = [];
           grouped[l1][row.section].push(row);
         }
+
+        const allL1 = [];
+
         for (const [l1Name, sections] of Object.entries(grouped)) {
           const l1Tr = document.createElement("tr");
-          l1Tr.className = "group-l1";
+          l1Tr.className = "group-l1 collapsed";
           const l1Td = document.createElement("td");
           l1Td.colSpan = 4;
           l1Td.textContent = l1Name;
           l1Tr.appendChild(l1Td);
           tbody.appendChild(l1Tr);
           const l1Children = [];
+          const l2Groups = [];
+
           for (const [secName, secRows] of Object.entries(sections)) {
             const l2Tr = document.createElement("tr");
-            l2Tr.className = "group-l2";
+            l2Tr.className = "group-l2 collapsed hidden-row";
             const l2Td = document.createElement("td");
             l2Td.colSpan = 4;
             l2Td.textContent = secName;
@@ -1063,7 +1078,7 @@
             const l2Children = [];
             for (const row of secRows) {
               const tr = document.createElement("tr");
-              tr.className = "evidence-row";
+              tr.className = "evidence-row hidden-row";
               const levelClass = `level-${String(row.confidence_level || "").toLowerCase()}`;
               tr.innerHTML = `
                 <td>${escapeHtml(row.field)}</td>
@@ -1076,7 +1091,7 @@
               l2Children.push(tr);
               const ev = evIdx[`${row.section}|||${row.field}`];
               const snippetTr = document.createElement("tr");
-              snippetTr.className = "snippet-row";
+              snippetTr.className = "snippet-row hidden-row";
               const snippetTd = document.createElement("td");
               snippetTd.colSpan = 4;
               if (ev && ev.snippet && ev.snippet !== "NOT FOUND IN CONTRACT") {
@@ -1094,14 +1109,36 @@
                 snippetTr.classList.toggle("open", tr.classList.contains("open"));
               });
             }
+            l2Groups.push({ l2Tr, l2Children });
             l2Tr.addEventListener("click", () => {
-              const collapsed = l2Tr.classList.toggle("collapsed");
-              l2Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
+              const wasCollapsed = l2Tr.classList.contains("collapsed");
+              l2Groups.forEach(g => {
+                g.l2Tr.classList.add("collapsed");
+                g.l2Children.forEach(r => { r.classList.add("hidden-row"); r.classList.remove("open"); });
+              });
+              if (wasCollapsed) {
+                l2Tr.classList.remove("collapsed");
+                l2Children.forEach(r => r.classList.remove("hidden-row"));
+              }
             });
           }
+          allL1.push({ l1Tr, l1Children, l2Groups });
           l1Tr.addEventListener("click", () => {
-            const collapsed = l1Tr.classList.toggle("collapsed");
-            l1Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
+            const wasCollapsed = l1Tr.classList.contains("collapsed");
+            allL1.forEach(g => {
+              g.l1Tr.classList.add("collapsed");
+              g.l1Children.forEach(r => { r.classList.add("hidden-row"); r.classList.remove("open"); });
+              g.l2Groups.forEach(sg => { sg.l2Tr.classList.add("collapsed"); sg.l2Children.forEach(r => r.classList.remove("open")); });
+            });
+            if (wasCollapsed) {
+              l1Tr.classList.remove("collapsed");
+              l1Children.forEach(r => {
+                if (r.classList.contains("group-l2") || (!r.classList.contains("evidence-row") && !r.classList.contains("snippet-row"))) {
+                  r.classList.remove("hidden-row");
+                }
+              });
+              l2Groups.forEach(g => g.l2Tr.classList.remove("hidden-row"));
+            }
           });
         }
       }
@@ -1215,9 +1252,10 @@
           grouped[f.section].push(f);
         }
 
+        const allSections = [];
         for (const [section, fields] of Object.entries(grouped)) {
           const secTr = document.createElement("tr");
-          secTr.className = "sec-header";
+          secTr.className = "sec-header collapsed";
           const secTd = document.createElement("td");
           secTd.colSpan = 5;
           secTd.textContent = section;
@@ -1228,7 +1266,7 @@
           for (const f of fields) {
             const tr = document.createElement("tr");
             const expandable = hasDetailContent(f);
-            tr.className = expandable ? "compare-data-row" : "";
+            tr.className = (expandable ? "compare-data-row" : "") + " hidden-row";
             const simPct = Math.round(f.similarity * 100);
             const NOT_FOUND_STR = "NOT FOUND IN CONTRACT";
 
@@ -1251,7 +1289,7 @@
 
             if (expandable) {
               const detailTr = document.createElement("tr");
-              detailTr.className = "compare-detail-row";
+              detailTr.className = "compare-detail-row hidden-row";
               const detailTd = document.createElement("td");
               detailTd.colSpan = 5;
               detailTd.innerHTML = `<div class="compare-detail-panels">`
@@ -1276,9 +1314,19 @@
             }
           }
 
+          allSections.push({ secTr, childRows });
           secTr.addEventListener("click", () => {
-            const collapsed = secTr.classList.toggle("collapsed");
-            childRows.forEach(r => r.classList.toggle("hidden-row", collapsed));
+            const wasCollapsed = secTr.classList.contains("collapsed");
+            allSections.forEach(s => {
+              s.secTr.classList.add("collapsed");
+              s.childRows.forEach(r => { r.classList.add("hidden-row"); r.classList.remove("open"); });
+            });
+            if (wasCollapsed) {
+              secTr.classList.remove("collapsed");
+              childRows.forEach(r => {
+                if (!r.classList.contains("compare-detail-row")) r.classList.remove("hidden-row");
+              });
+            }
           });
         }
 
