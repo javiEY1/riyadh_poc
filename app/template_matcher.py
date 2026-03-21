@@ -57,7 +57,7 @@ def _extract_flat_values(result: dict) -> dict[str, str]:
             code = clause.get("code", "")
             text = clause.get("text", NOT_FOUND)
             if text and text != NOT_FOUND:
-                flat[f"clause_{code}"] = text
+                flat[f"clause_{code}"] = "present"
             else:
                 flat[f"clause_{code}"] = ""
 
@@ -169,18 +169,17 @@ def compare_detailed(
         sim = _field_similarity(c_val, t_val)
         total_sim += sim
 
+        c_display = c_val if c_val else NOT_FOUND
+        t_display = t_val if t_val else NOT_FOUND
+
         if key.startswith("clause_"):
             label = key.replace("clause_", "").upper()
             section = "Clauses"
             c_text = c_clause_texts.get(key, "")
             t_text = t_clause_texts.get(key, "")
-            c_display = c_text if c_text else NOT_FOUND
-            t_display = t_text if t_text else NOT_FOUND
         else:
             label = FIELD_LABELS.get(key, key.replace("_", " ").title())
             section = SECTION_MAP.get(key, "Other")
-            c_display = c_val if c_val else NOT_FOUND
-            t_display = t_val if t_val else NOT_FOUND
 
         status = "match" if sim == 1.0 else "differ" if sim > 0 else "missing"
         if not c_val and not t_val:
