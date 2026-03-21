@@ -207,6 +207,57 @@
         border-radius: 3px;
         font-weight: 700;
       }
+      .settings-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }
+      .settings-row label {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--ra-primary);
+        white-space: nowrap;
+      }
+      .settings-row input[type="password"] {
+        flex: 1;
+        min-width: 200px;
+        padding: 0.45rem 0.7rem;
+        border: 1px solid #d4c4e8;
+        border-radius: 8px;
+        font-size: 0.9rem;
+      }
+      .settings-row .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .settings-row .status-dot.on { background: #0f7a42; }
+      .settings-row .status-dot.off { background: #b00020; }
+      .history-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .history-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #ece8f6;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .history-list li:hover { background: #f9f5ff; }
+      .history-list .hist-name { font-weight: 600; color: var(--ra-primary); flex: 1; }
+      .history-list .hist-meta {
+        display: flex;
+        gap: 0.6rem;
+        font-size: 0.82rem;
+        color: var(--ra-muted);
+      }
     </style>
   </head>
   <body>
@@ -220,6 +271,13 @@
       </header>
 
       <section class="card">
+        <div class="settings-row">
+          <label for="apiKeyInput">OpenAI API Key:</label>
+          <input type="password" id="apiKeyInput" placeholder="sk-..." />
+          <button id="saveKeyBtn" type="button">Save</button>
+          <span class="status-dot off" id="llmDot" title="LLM status"></span>
+          <span id="llmLabel" style="font-size:0.82rem;color:var(--ra-muted)">LLM off</span>
+        </div>
         <div class="controls">
           <input
             class="file-input"
@@ -238,6 +296,7 @@
         <div class="meta">
           <span class="pill" id="overallConfidence">Overall confidence: --</span>
           <span class="pill" id="ocrBadge">OCR used: --</span>
+          <span class="pill" id="methodBadge">Method: --</span>
         </div>
         <div class="actions">
           <button id="exportExcelBtn" type="button">Export Excel</button>
@@ -258,8 +317,14 @@
         </div>
       </section>
 
-
-
+      <section class="card">
+        <details>
+          <summary>Document History</summary>
+          <ul class="history-list" id="historyList">
+            <li style="color:var(--ra-muted);cursor:default">No documents yet.</li>
+          </ul>
+        </details>
+      </section>
     </div>
 
     <script>
@@ -273,7 +338,100 @@
       const resultsCard = document.getElementById("resultsCard");
       const exportExcelBtn = document.getElementById("exportExcelBtn");
       const exportJsonBtn = document.getElementById("exportJsonBtn");
+      const apiKeyInput = document.getElementById("apiKeyInput");
+      const saveKeyBtn = document.getElementById("saveKeyBtn");
+      const llmDot = document.getElementById("llmDot");
+      const llmLabel = document.getElementById("llmLabel");
+      const historyList = document.getElementById("historyList");
       let lastResult = null;
+
+      function updateLlmStatus(enabled) {
+        llmDot.className = `status-dot ${enabled ? "on" : "off"}`;
+        llmLabel.textContent = enabled ? "LLM active" : "LLM off (regex mode)";
+      }
+
+      (async () => {
+        try {
+          const stored = localStorage.getItem("openai_api_key");
+          if (stored) {
+            apiKeyInput.value = stored;
+            const res = await fetch("/settings", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ openai_api_key: stored }),
+            });
+            const data = await res.json();
+            updateLlmStatus(data.llm_enabled);
+          } else {
+            const res = await fetch("/settings");
+            const data = await res.json();
+            updateLlmStatus(data.llm_enabled);
+          }
+        } catch (_) { /* ignore */ }
+        loadHistory();
+      })();
+
+      saveKeyBtn.addEventListener("click", async () => {
+        const key = apiKeyInput.value.trim();
+        localStorage.setItem("openai_api_key", key);
+        try {
+          const res = await fetch("/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ openai_api_key: key }),
+          });
+          const data = await res.json();
+          updateLlmStatus(data.llm_enabled);
+        } catch (e) {
+          errorEl.textContent = "Failed to save API key: " + e.message;
+        }
+      });
+
+      async function loadHistory() {
+        try {
+          const res = await fetch("/documents");
+          const docs = await res.json();
+          historyList.innerHTML = "";
+          if (!docs.length) {
+            historyList.innerHTML = '<li style="color:var(--ra-muted);cursor:default">No documents yet.</li>';
+            return;
+          }
+          for (const doc of docs) {
+            const li = document.createElement("li");
+            const date = doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : "";
+            const conf = doc.overall_confidence != null ? `${Math.round(doc.overall_confidence * 100)}%` : "--";
+            li.innerHTML = `
+              <span class="hist-name">${escapeHtml(doc.filename)}</span>
+              <span class="hist-meta">
+                <span>${escapeHtml(doc.extraction_method)}</span>
+                <span>${conf}</span>
+                <span>${escapeHtml(date)}</span>
+              </span>
+            `;
+            li.addEventListener("click", () => loadDocument(doc.id));
+            historyList.appendChild(li);
+          }
+        } catch (_) { /* ignore */ }
+      }
+
+      async function loadDocument(id) {
+        try {
+          const res = await fetch(`/documents/${id}`);
+          const doc = await res.json();
+          const data = doc.result;
+          renderTable(data.confidence_table || [], data.evidence_table || []);
+          const overall = typeof data.overall_confidence === "number"
+            ? `${Math.round(data.overall_confidence * 100)}%` : "--";
+          overallConfidenceEl.textContent = `Overall confidence: ${overall}`;
+          ocrBadgeEl.textContent = `OCR used: ${data.ocr_used ? "Yes" : "No"}`;
+          methodBadgeEl.textContent = `Method: ${escapeHtml(doc.extraction_method || "regex")}`;
+          resultsCard.style.display = "block";
+          lastResult = data;
+          statusEl.textContent = `Loaded: ${escapeHtml(doc.filename)}`;
+        } catch (e) {
+          errorEl.textContent = "Failed to load document: " + e.message;
+        }
+      }
 
       function escapeHtml(value) {
         return String(value)
@@ -479,6 +637,8 @@
         }
       });
 
+      const methodBadgeEl = document.getElementById("methodBadge");
+
       btn.addEventListener("click", async () => {
         const file = fileInput.files[0];
         errorEl.textContent = "";
@@ -486,6 +646,7 @@
         resultsCard.style.display = "none";
         overallConfidenceEl.textContent = "Overall confidence: --";
         ocrBadgeEl.textContent = "OCR used: --";
+        methodBadgeEl.textContent = "Method: --";
         lastResult = null;
 
         if (!file) {
@@ -510,9 +671,11 @@
             : "--";
           overallConfidenceEl.textContent = `Overall confidence: ${overall}`;
           ocrBadgeEl.textContent = `OCR used: ${data.ocr_used ? "Yes" : "No"}`;
+          methodBadgeEl.textContent = `Method: ${escapeHtml(data.extraction_method || "regex")}`;
           resultsCard.style.display = "block";
           lastResult = data;
           statusEl.textContent = "Analysis completed.";
+          loadHistory();
         } catch (error) {
           statusEl.textContent = "";
           errorEl.textContent = error.message;
