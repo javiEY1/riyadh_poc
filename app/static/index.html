@@ -267,23 +267,7 @@
         </div>
       </section>
 
-      <section class="card" id="evidenceCard" style="display: none">
-        <details open>
-          <summary>Evidence by extracted field (click a row to reveal the document snippet)</summary>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Section</th>
-                  <th>Field</th>
-                  <th>Extracted Value</th>
-                </tr>
-              </thead>
-              <tbody id="evidenceBody"></tbody>
-            </table>
-          </div>
-        </details>
-      </section>
+
 
     </div>
 
@@ -296,8 +280,6 @@
       const overallConfidenceEl = document.getElementById("overallConfidence");
       const ocrBadgeEl = document.getElementById("ocrBadge");
       const resultsCard = document.getElementById("resultsCard");
-      const evidenceCard = document.getElementById("evidenceCard");
-      const evidenceBody = document.getElementById("evidenceBody");
       const exportExcelBtn = document.getElementById("exportExcelBtn");
       const exportJsonBtn = document.getElementById("exportJsonBtn");
       let lastResult = null;
@@ -323,12 +305,23 @@
         return "Contract Clauses";
       }
 
-      function renderTable(rows) {
+      function buildEvidenceIndex(evidenceRows) {
+        const idx = {};
+        for (const ev of evidenceRows || []) {
+          const key = `${ev.section}|||${ev.field}`;
+          idx[key] = ev;
+        }
+        return idx;
+      }
+
+      function renderTable(confRows, evidenceRows) {
         tableBody.innerHTML = "";
-        if (!rows || !rows.length) return;
+        if (!confRows || !confRows.length) return;
+
+        const evIdx = buildEvidenceIndex(evidenceRows);
 
         const grouped = {};
-        for (const row of rows) {
+        for (const row of confRows) {
           const l1 = classifyLevel1(row.section);
           if (!grouped[l1]) grouped[l1] = {};
           if (!grouped[l1][row.section]) grouped[l1][row.section] = [];
@@ -359,6 +352,7 @@
             const l2Children = [];
             for (const row of secRows) {
               const tr = document.createElement("tr");
+              tr.className = "evidence-row";
               const levelClass = `level-${String(row.confidence_level || "").toLowerCase()}`;
               tr.innerHTML = `
                 <td>${escapeHtml(row.field)}</td>
@@ -369,6 +363,27 @@
               tableBody.appendChild(tr);
               l1Children.push(tr);
               l2Children.push(tr);
+
+              const ev = evIdx[`${row.section}|||${row.field}`];
+              const snippetTr = document.createElement("tr");
+              snippetTr.className = "snippet-row";
+              const snippetTd = document.createElement("td");
+              snippetTd.colSpan = 4;
+              if (ev && ev.snippet && ev.snippet !== "NOT FOUND IN CONTRACT") {
+                snippetTd.innerHTML = `<div class="snippet-box">${highlightSnippet(ev.snippet, ev.highlight_terms)}</div>`;
+              } else {
+                snippetTd.innerHTML = `<div class="snippet-box" style="color:var(--ra-muted);font-style:italic">No matching snippet found in the contract.</div>`;
+              }
+              snippetTr.appendChild(snippetTd);
+              tableBody.appendChild(snippetTr);
+              l1Children.push(snippetTr);
+              l2Children.push(snippetTr);
+
+              tr.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isOpen = tr.classList.toggle("open");
+                snippetTr.classList.toggle("open", isOpen);
+              });
             }
 
             l2Tr.addEventListener("click", () => {
@@ -416,32 +431,7 @@
         return output;
       }
 
-      function renderEvidence(rows) {
-        evidenceBody.innerHTML = "";
-        for (const row of rows || []) {
-          const tr = document.createElement("tr");
-          tr.className = "evidence-row";
-          tr.innerHTML = `
-            <td>${escapeHtml(row.section)}</td>
-            <td>${escapeHtml(row.field)}</td>
-            <td>${escapeHtml(row.value)}</td>
-          `;
-          evidenceBody.appendChild(tr);
 
-          const snippetTr = document.createElement("tr");
-          snippetTr.className = "snippet-row";
-          const snippetTd = document.createElement("td");
-          snippetTd.colSpan = 3;
-          snippetTd.innerHTML = `<div class="snippet-box">${highlightSnippet(row.snippet, row.highlight_terms)}</div>`;
-          snippetTr.appendChild(snippetTd);
-          evidenceBody.appendChild(snippetTr);
-
-          tr.addEventListener("click", () => {
-            const isOpen = tr.classList.toggle("open");
-            snippetTr.classList.toggle("open", isOpen);
-          });
-        }
-      }
 
       function getFilenameFromResponse(response, fallback) {
         const contentDisposition = response.headers.get("Content-Disposition") || "";
@@ -502,9 +492,7 @@
         const file = fileInput.files[0];
         errorEl.textContent = "";
         tableBody.innerHTML = "";
-        evidenceBody.innerHTML = "";
         resultsCard.style.display = "none";
-        evidenceCard.style.display = "none";
         overallConfidenceEl.textContent = "Overall confidence: --";
         ocrBadgeEl.textContent = "OCR used: --";
         lastResult = null;
@@ -525,15 +513,13 @@
             throw new Error(data.detail || "Extraction failed");
           }
 
-          renderTable(data.confidence_table || []);
-          renderEvidence(data.evidence_table || []);
+          renderTable(data.confidence_table || [], data.evidence_table || []);
           const overall = typeof data.overall_confidence === "number"
             ? `${Math.round(data.overall_confidence * 100)}%`
             : "--";
           overallConfidenceEl.textContent = `Overall confidence: ${overall}`;
           ocrBadgeEl.textContent = `OCR used: ${data.ocr_used ? "Yes" : "No"}`;
           resultsCard.style.display = "block";
-          evidenceCard.style.display = "block";
           lastResult = data;
           statusEl.textContent = "Analysis completed.";
         } catch (error) {
