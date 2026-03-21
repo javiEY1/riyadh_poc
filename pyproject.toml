@@ -27,6 +27,11 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["config*"]
+namespaces = false
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
