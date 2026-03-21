@@ -147,6 +147,40 @@
         border-radius: 10px;
         overflow-x: auto;
       }
+      .evidence-row { cursor: pointer; }
+      .evidence-row:hover { background: #f9f5ff; }
+      .evidence-row td:first-child::before {
+        content: "\25B6";
+        display: inline-block;
+        margin-right: 0.4rem;
+        font-size: 0.7rem;
+        transition: transform 0.2s;
+        color: var(--ra-accent-strong);
+      }
+      .evidence-row.open td:first-child::before {
+        transform: rotate(90deg);
+      }
+      .snippet-row { display: none; }
+      .snippet-row.open { display: table-row; }
+      .snippet-box {
+        background: #faf7ff;
+        border-left: 4px solid var(--ra-accent-strong);
+        padding: 0.75rem 1rem;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.88rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #3a2e50;
+        border-radius: 0 8px 8px 0;
+      }
+      .snippet-box mark {
+        background: #d4a5ff;
+        color: #1a0033;
+        padding: 0.1rem 0.25rem;
+        border-radius: 3px;
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -204,7 +238,7 @@
 
       <section class="card" id="evidenceCard" style="display: none">
         <details open>
-          <summary>Evidence by extracted field (snippet with highlighted values)</summary>
+          <summary>Evidence by extracted field (click a row to reveal the document snippet)</summary>
           <div class="table-wrap">
             <table>
               <thead>
@@ -212,7 +246,6 @@
                   <th>Section</th>
                   <th>Field</th>
                   <th>Extracted Value</th>
-                  <th>Snippet</th>
                 </tr>
               </thead>
               <tbody id="evidenceBody"></tbody>
@@ -306,13 +339,26 @@
         evidenceBody.innerHTML = "";
         for (const row of rows || []) {
           const tr = document.createElement("tr");
+          tr.className = "evidence-row";
           tr.innerHTML = `
             <td>${escapeHtml(row.section)}</td>
             <td>${escapeHtml(row.field)}</td>
             <td>${escapeHtml(row.value)}</td>
-            <td>${highlightSnippet(row.snippet, row.highlight_terms)}</td>
           `;
           evidenceBody.appendChild(tr);
+
+          const snippetTr = document.createElement("tr");
+          snippetTr.className = "snippet-row";
+          const snippetTd = document.createElement("td");
+          snippetTd.colSpan = 3;
+          snippetTd.innerHTML = `<div class="snippet-box">${highlightSnippet(row.snippet, row.highlight_terms)}</div>`;
+          snippetTr.appendChild(snippetTd);
+          evidenceBody.appendChild(snippetTr);
+
+          tr.addEventListener("click", () => {
+            const isOpen = tr.classList.toggle("open");
+            snippetTr.classList.toggle("open", isOpen);
+          });
         }
       }
 
