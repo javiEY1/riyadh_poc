@@ -137,6 +137,45 @@
         vertical-align: top;
       }
       th { background: #f6f1ff; color: #352b4d; }
+      .group-l1 {
+        background: #e8ddf8;
+        color: #2c1a4a;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .group-l1:hover { background: #ddd0f3; }
+      .group-l1 td::before {
+        content: "\25BC";
+        display: inline-block;
+        margin-right: 0.45rem;
+        font-size: 0.65rem;
+        transition: transform 0.2s;
+      }
+      .group-l1.collapsed td::before {
+        transform: rotate(-90deg);
+      }
+      .group-l2 {
+        background: #f3edfc;
+        color: #3d2a63;
+        font-weight: 600;
+        font-size: 0.91rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .group-l2:hover { background: #ece4f9; }
+      .group-l2 td::before {
+        content: "\25B8";
+        display: inline-block;
+        margin-right: 0.35rem;
+        font-size: 0.65rem;
+        transition: transform 0.2s;
+      }
+      .group-l2.collapsed td::before {
+        transform: rotate(-90deg);
+      }
+      .hidden-row { display: none; }
       .level-high { color: #0f7a42; font-weight: 600; }
       .level-medium { color: #9b6a05; font-weight: 600; }
       .level-low { color: #b00020; font-weight: 600; }
@@ -217,7 +256,6 @@
           <table>
             <thead>
               <tr>
-                <th>Section</th>
                 <th>Field</th>
                 <th>Value</th>
                 <th>Confidence</th>
@@ -273,19 +311,76 @@
           .replaceAll("'", "&#39;");
       }
 
+      const METADATA_SECTIONS = new Set([
+        "Contract Classification", "Jurisdictions",
+        "Contract Details", "Nature of Supply",
+      ]);
+
+      function classifyLevel1(section) {
+        if (METADATA_SECTIONS.has(section) || section.startsWith("Parties")) {
+          return "Contract Metadata";
+        }
+        return "Contract Clauses";
+      }
+
       function renderTable(rows) {
         tableBody.innerHTML = "";
-        for (const row of rows || []) {
-          const tr = document.createElement("tr");
-          const levelClass = `level-${String(row.confidence_level || "").toLowerCase()}`;
-          tr.innerHTML = `
-            <td>${escapeHtml(row.section)}</td>
-            <td>${escapeHtml(row.field)}</td>
-            <td>${escapeHtml(row.value)}</td>
-            <td>${escapeHtml(row.confidence_score)}</td>
-            <td class="${levelClass}">${escapeHtml(row.confidence_level)}</td>
-          `;
-          tableBody.appendChild(tr);
+        if (!rows || !rows.length) return;
+
+        const grouped = {};
+        for (const row of rows) {
+          const l1 = classifyLevel1(row.section);
+          if (!grouped[l1]) grouped[l1] = {};
+          if (!grouped[l1][row.section]) grouped[l1][row.section] = [];
+          grouped[l1][row.section].push(row);
+        }
+
+        for (const [l1Name, sections] of Object.entries(grouped)) {
+          const l1Tr = document.createElement("tr");
+          l1Tr.className = "group-l1";
+          const l1Td = document.createElement("td");
+          l1Td.colSpan = 4;
+          l1Td.textContent = l1Name;
+          l1Tr.appendChild(l1Td);
+          tableBody.appendChild(l1Tr);
+
+          const l1Children = [];
+
+          for (const [secName, secRows] of Object.entries(sections)) {
+            const l2Tr = document.createElement("tr");
+            l2Tr.className = "group-l2";
+            const l2Td = document.createElement("td");
+            l2Td.colSpan = 4;
+            l2Td.textContent = secName;
+            l2Tr.appendChild(l2Td);
+            tableBody.appendChild(l2Tr);
+            l1Children.push(l2Tr);
+
+            const l2Children = [];
+            for (const row of secRows) {
+              const tr = document.createElement("tr");
+              const levelClass = `level-${String(row.confidence_level || "").toLowerCase()}`;
+              tr.innerHTML = `
+                <td>${escapeHtml(row.field)}</td>
+                <td>${escapeHtml(row.value)}</td>
+                <td>${escapeHtml(row.confidence_score)}</td>
+                <td class="${levelClass}">${escapeHtml(row.confidence_level)}</td>
+              `;
+              tableBody.appendChild(tr);
+              l1Children.push(tr);
+              l2Children.push(tr);
+            }
+
+            l2Tr.addEventListener("click", () => {
+              const collapsed = l2Tr.classList.toggle("collapsed");
+              l2Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
+            });
+          }
+
+          l1Tr.addEventListener("click", () => {
+            const collapsed = l1Tr.classList.toggle("collapsed");
+            l1Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
+          });
         }
       }
 
