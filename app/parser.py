@@ -309,6 +309,7 @@ class ParserRuntimeConfig:
     buyer_role_terms: List[str]
     legal_entity_markers: List[str]
     entity_stop_phrases: List[str]
+    clause_overrides: Dict[str, List[str]]
 
 
 def _split_csv(value: str) -> List[str]:
@@ -325,6 +326,22 @@ def _cfg_list(metadata_prompt: str | None, key: str, default: List[str]) -> List
     return parsed or default
 
 
+def _parse_clause_overrides(metadata_prompt: str | None) -> Dict[str, List[str]]:
+    overrides: Dict[str, List[str]] = {}
+    if not metadata_prompt:
+        return overrides
+    for match in re.finditer(
+        r"^\s*clause\.([A-Z]{2,4}\d{3})\.keywords\s*=\s*(.+)$",
+        metadata_prompt,
+        flags=re.IGNORECASE | re.MULTILINE,
+    ):
+        code = match.group(1).upper()
+        keywords = [kw.strip().lower() for kw in match.group(2).split(",") if kw.strip()]
+        if keywords:
+            overrides[code] = keywords
+    return overrides
+
+
 def _build_runtime_config(metadata_prompt: str | None) -> ParserRuntimeConfig:
     return ParserRuntimeConfig(
         supplier_role_terms=_cfg_list(metadata_prompt, "supplier_role_terms", DEFAULT_SUPPLIER_ROLE_TERMS),
@@ -335,6 +352,7 @@ def _build_runtime_config(metadata_prompt: str | None) -> ParserRuntimeConfig:
             "entity_stop_phrases",
             list(DEFAULT_ENTITY_STOP_PHRASES),
         ),
+        clause_overrides=_parse_clause_overrides(metadata_prompt),
     )
 
 
@@ -511,11 +529,16 @@ def _match_clause(sections: List[Section], keywords: List[str]) -> Tuple[str, st
     return excerpt or NOT_FOUND, best_section.reference
 
 
-def _extract_clause_groups(sections: List[Section]) -> Dict[str, List[ClauseExtraction]]:
+def _extract_clause_groups(
+    sections: List[Section],
+    config: ParserRuntimeConfig | None = None,
+) -> Dict[str, List[ClauseExtraction]]:
+    overrides = config.clause_overrides if config else {}
     out: Dict[str, List[ClauseExtraction]] = {}
     for group_name, items in CLAUSE_DEFINITIONS.items():
         group_rows: List[ClauseExtraction] = []
-        for code, title, keywords in items:
+        for code, title, default_keywords in items:
+            keywords = overrides.get(code, default_keywords)
             text, ref = _match_clause(sections, keywords)
             group_rows.append(ClauseExtraction(code=code, title=title, text=text, reference=ref))
         out[group_name] = group_rows
@@ -834,7 +857,7 @@ def parse_contract(
     cleaned = _clean_text(text)
     runtime_config = _build_runtime_config(metadata_prompt)
     sections = _split_sections(cleaned)
-    clause_groups = _extract_clause_groups(sections)
+    clause_groups = _extract_clause_groups(sections, runtime_config)
 
     parties = _extract_parties(cleaned, runtime_config)
     if not parties:

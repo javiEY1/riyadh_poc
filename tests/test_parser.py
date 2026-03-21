@@ -79,3 +79,26 @@ def test_parser_accepts_role_terms_from_metadata_prompt() -> None:
     suppliers = [p for p in result.parties if p.role == "Supplier/Vendor"]
     assert suppliers
     assert suppliers[0].name == "Delta Engineering Ltd"
+
+
+def test_clause_keyword_overrides_from_config() -> None:
+    contract = """
+    CONSULTING AGREEMENT
+    Between Alpha LLC (Buyer) and Beta Ltd (Supplier).
+    Effective date: 01 Jan 2026.
+
+    1. Custom Fiscal Section
+    The fiscal treatment of this agreement includes all applicable levies and duties.
+    """
+    metadata_prompt = """
+    supplier_role_terms = supplier
+    buyer_role_terms = buyer
+    legal_entity_markers = llc,ltd
+    entity_stop_phrases = this agreement,shall
+    clause.TAX002.keywords = fiscal,levies,duties
+    """
+    result = parse_contract(contract, metadata_prompt=metadata_prompt)
+    tax_clauses = result.clause_groups["Tax-related clauses"]
+    tax002 = next(c for c in tax_clauses if c.code == "TAX002")
+    assert tax002.text != "NOT FOUND IN CONTRACT"
+    assert "fiscal" in tax002.text.lower() or "levies" in tax002.text.lower()
