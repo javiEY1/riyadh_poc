@@ -196,8 +196,13 @@ def _build_confidence_from_llm(result: ExtractionResult) -> List[ConfidenceRow]:
     add("Contract Classification", "Primary Type", result.contract_classification.primary_type, 0.90)
     add("Contract Classification", "Sub Type", result.contract_classification.sub_type, 0.85)
 
-    for idx, party in enumerate(result.parties, 1):
-        sec = f"Parties [{idx}]"
+    for party in result.parties:
+        if party.role == "Buyer/Client":
+            sec = "Buyer"
+        elif party.role == "Supplier/Vendor":
+            sec = "Supplier"
+        else:
+            sec = "Other Party"
         add(sec, "Name", party.name, 0.92)
         add(sec, "Role", party.role, 0.95)
         add(sec, "Registered Address", party.registered_address, 0.85)

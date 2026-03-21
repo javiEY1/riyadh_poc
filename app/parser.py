@@ -854,8 +854,13 @@ def _build_confidence_table(
         _score_basic_value(result.contract_classification.sub_type),
     )
 
-    for idx, party in enumerate(result.parties, start=1):
-        party_section = f"Parties [{idx}]"
+    for party in result.parties:
+        if party.role == "Buyer/Client":
+            party_section = "Buyer"
+        elif party.role == "Supplier/Vendor":
+            party_section = "Supplier"
+        else:
+            party_section = "Other Party"
         _add_conf_row(rows, party_section, "Name", party.name, _score_party_name(party.name, config))
         _add_conf_row(rows, party_section, "Role", party.role, 0.95 if party.role != "Other" else 0.4)
         _add_conf_row(

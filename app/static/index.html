@@ -445,10 +445,11 @@
       const METADATA_SECTIONS = new Set([
         "Contract Classification", "Jurisdictions",
         "Contract Details", "Nature of Supply",
+        "Buyer", "Supplier", "Other Party",
       ]);
 
       function classifyLevel1(section) {
-        if (METADATA_SECTIONS.has(section) || section.startsWith("Parties")) {
+        if (METADATA_SECTIONS.has(section)) {
           return "Contract Metadata";
         }
         return "Contract Clauses";
