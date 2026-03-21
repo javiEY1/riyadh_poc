@@ -70,8 +70,8 @@ def test_parser_accepts_role_terms_from_metadata_prompt() -> None:
     Between Orion Procurement LLC (the Buyer) and Delta Engineering Ltd (the Partner).
     """
     metadata_prompt = """
-    supplier_role_terms = partner
-    buyer_role_terms = buyer
+    field.supplier_role.keywords = partner
+    field.buyer_role.keywords = buyer
     legal_entity_markers = llc,ltd
     entity_stop_phrases = this agreement,shall
     """
@@ -91,8 +91,8 @@ def test_clause_keyword_overrides_from_config() -> None:
     The fiscal treatment of this agreement includes all applicable levies and duties.
     """
     metadata_prompt = """
-    supplier_role_terms = supplier
-    buyer_role_terms = buyer
+    field.supplier_role.keywords = supplier
+    field.buyer_role.keywords = buyer
     legal_entity_markers = llc,ltd
     entity_stop_phrases = this agreement,shall
     clause.TAX002.keywords = fiscal,levies,duties

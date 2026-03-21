@@ -80,19 +80,19 @@ async def extract_contract(file: UploadFile = File(...)) -> dict:
         )
 
     extraction_method = "regex"
+    metadata_prompt = load_metadata_prompt()
 
     if _openai_api_key:
         try:
             result = await parse_contract_with_llm(
                 text, api_key=_openai_api_key, ocr_used=ocr_used,
+                metadata_prompt=metadata_prompt,
             )
             extraction_method = "llm"
         except Exception:
             logger.exception("LLM extraction failed, falling back to regex parser")
-            metadata_prompt = load_metadata_prompt()
             result = parse_contract(text, ocr_used=ocr_used, metadata_prompt=metadata_prompt)
     else:
-        metadata_prompt = load_metadata_prompt()
         result = parse_contract(text, ocr_used=ocr_used, metadata_prompt=metadata_prompt)
 
     doc = await save_document(file.filename, result, extraction_method=extraction_method)

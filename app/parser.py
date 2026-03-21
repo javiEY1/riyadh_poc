@@ -155,16 +155,51 @@ CLAUSE_DEFINITIONS: Dict[str, List[Tuple[str, str, List[str]]]] = {
 }
 
 DEFAULT_SUPPLIER_ROLE_TERMS = [
-    "supplier",
-    "vendor",
-    "seller",
-    "contractor",
-    "service provider",
-    "provider",
-    "licensor",
+    "supplier", "vendor", "seller", "contractor", "service provider", "provider", "licensor",
 ]
-
 DEFAULT_BUYER_ROLE_TERMS = ["buyer", "client", "purchaser", "licensee"]
+
+DEFAULT_PRIMARY_TYPE_KEYWORDS = [
+    "service agreement", "consulting agreement", "supply agreement", "software", "saas",
+    "license agreement", "fuel supply", "goods",
+]
+DEFAULT_SUB_TYPE_KEYWORDS = [
+    "advisory", "operational", "subscription", "maintenance", "procurement", "leasing",
+]
+DEFAULT_TITLE_KEYWORDS = [
+    "agreement", "contract", "master service agreement", "statement of work", "framework agreement",
+]
+DEFAULT_EFFECTIVE_DATE_KEYWORDS = [
+    "effective date", "commencement date", "start date", "dated as of", "entered into",
+]
+DEFAULT_TERM_DURATION_KEYWORDS = ["term", "duration", "period of", "months", "years"]
+DEFAULT_RENEWAL_KEYWORDS = ["renewal", "auto-renew", "auto renew", "extend", "extension"]
+DEFAULT_ESTIMATED_VALUE_KEYWORDS = [
+    "total value", "contract value", "estimated value", "aggregate", "consideration", "not to exceed",
+]
+DEFAULT_PAYMENT_CURRENCY_KEYWORDS = [
+    "usd", "eur", "gbp", "aed", "sar", "qar", "kwd", "omr", "bhd", "inr", "currency",
+]
+DEFAULT_LANGUAGE_KEYWORDS = ["english", "arabic", "language of the agreement"]
+DEFAULT_EXPIRATION_DATE_KEYWORDS = [
+    "expiration date", "expiry date", "end date", "termination date",
+]
+DEFAULT_SUPPLIER_JURISDICTION_KEYWORDS = [
+    "supplier jurisdiction", "vendor jurisdiction", "incorporated", "organized under",
+]
+DEFAULT_BUYER_JURISDICTION_KEYWORDS = [
+    "buyer jurisdiction", "client jurisdiction", "purchaser jurisdiction",
+]
+DEFAULT_SERVICE_DELIVERY_KEYWORDS = [
+    "place of supply", "service location", "performed at", "delivery location", "delivered in",
+]
+DEFAULT_DESCRIPTION_KEYWORDS = [
+    "scope of services", "nature of supply", "services description", "work description",
+]
+DEFAULT_VERBATIM_SCOPE_KEYWORDS = [
+    "scope of services", "statement of work", "deliverables", "scope of work",
+]
+DEFAULT_SCOPE_REF_KEYWORDS = ["section", "article", "clause", "schedule", "annex", "exhibit"]
 
 DEFAULT_LEGAL_ENTITY_MARKERS = [
     "llc",
@@ -323,6 +358,22 @@ class ParserRuntimeConfig:
     supplier_address_keywords: List[str]
     buyer_jurisdiction_keywords: List[str]
     supplier_jurisdiction_keywords: List[str]
+    primary_type_keywords: List[str]
+    sub_type_keywords: List[str]
+    title_keywords: List[str]
+    effective_date_keywords: List[str]
+    term_duration_keywords: List[str]
+    renewal_keywords: List[str]
+    estimated_value_keywords: List[str]
+    payment_currency_keywords: List[str]
+    language_keywords: List[str]
+    expiration_date_keywords: List[str]
+    supplier_jurisdiction_field_keywords: List[str]
+    buyer_jurisdiction_field_keywords: List[str]
+    service_delivery_keywords: List[str]
+    description_keywords: List[str]
+    verbatim_scope_keywords: List[str]
+    scope_ref_keywords: List[str]
 
 
 def _split_csv(value: str) -> List[str]:
@@ -357,13 +408,15 @@ def _parse_clause_overrides(metadata_prompt: str | None) -> Dict[str, List[str]]
 
 def _build_runtime_config(metadata_prompt: str | None) -> ParserRuntimeConfig:
     return ParserRuntimeConfig(
-        supplier_role_terms=_cfg_list(metadata_prompt, "supplier_role_terms", DEFAULT_SUPPLIER_ROLE_TERMS),
-        buyer_role_terms=_cfg_list(metadata_prompt, "buyer_role_terms", DEFAULT_BUYER_ROLE_TERMS),
+        supplier_role_terms=_cfg_list(
+            metadata_prompt, "field.supplier_role.keywords", DEFAULT_SUPPLIER_ROLE_TERMS,
+        ),
+        buyer_role_terms=_cfg_list(
+            metadata_prompt, "field.buyer_role.keywords", DEFAULT_BUYER_ROLE_TERMS,
+        ),
         legal_entity_markers=_cfg_list(metadata_prompt, "legal_entity_markers", DEFAULT_LEGAL_ENTITY_MARKERS),
         entity_stop_phrases=_cfg_list(
-            metadata_prompt,
-            "entity_stop_phrases",
-            list(DEFAULT_ENTITY_STOP_PHRASES),
+            metadata_prompt, "entity_stop_phrases", list(DEFAULT_ENTITY_STOP_PHRASES),
         ),
         clause_overrides=_parse_clause_overrides(metadata_prompt),
         buyer_name_keywords=_cfg_list(
@@ -383,6 +436,54 @@ def _build_runtime_config(metadata_prompt: str | None) -> ParserRuntimeConfig:
         ),
         supplier_jurisdiction_keywords=_cfg_list(
             metadata_prompt, "field.supplier_party_jurisdiction.keywords", DEFAULT_PARTY_JURISDICTION_KEYWORDS,
+        ),
+        primary_type_keywords=_cfg_list(
+            metadata_prompt, "field.primary_type.keywords", DEFAULT_PRIMARY_TYPE_KEYWORDS,
+        ),
+        sub_type_keywords=_cfg_list(
+            metadata_prompt, "field.sub_type.keywords", DEFAULT_SUB_TYPE_KEYWORDS,
+        ),
+        title_keywords=_cfg_list(
+            metadata_prompt, "field.title.keywords", DEFAULT_TITLE_KEYWORDS,
+        ),
+        effective_date_keywords=_cfg_list(
+            metadata_prompt, "field.effective_date.keywords", DEFAULT_EFFECTIVE_DATE_KEYWORDS,
+        ),
+        term_duration_keywords=_cfg_list(
+            metadata_prompt, "field.term_duration.keywords", DEFAULT_TERM_DURATION_KEYWORDS,
+        ),
+        renewal_keywords=_cfg_list(
+            metadata_prompt, "field.renewal_provisions.keywords", DEFAULT_RENEWAL_KEYWORDS,
+        ),
+        estimated_value_keywords=_cfg_list(
+            metadata_prompt, "field.estimated_value.keywords", DEFAULT_ESTIMATED_VALUE_KEYWORDS,
+        ),
+        payment_currency_keywords=_cfg_list(
+            metadata_prompt, "field.payment_currency.keywords", DEFAULT_PAYMENT_CURRENCY_KEYWORDS,
+        ),
+        language_keywords=_cfg_list(
+            metadata_prompt, "field.language.keywords", DEFAULT_LANGUAGE_KEYWORDS,
+        ),
+        expiration_date_keywords=_cfg_list(
+            metadata_prompt, "field.expiration_date.keywords", DEFAULT_EXPIRATION_DATE_KEYWORDS,
+        ),
+        supplier_jurisdiction_field_keywords=_cfg_list(
+            metadata_prompt, "field.supplier_jurisdiction.keywords", DEFAULT_SUPPLIER_JURISDICTION_KEYWORDS,
+        ),
+        buyer_jurisdiction_field_keywords=_cfg_list(
+            metadata_prompt, "field.buyer_jurisdiction.keywords", DEFAULT_BUYER_JURISDICTION_KEYWORDS,
+        ),
+        service_delivery_keywords=_cfg_list(
+            metadata_prompt, "field.service_delivery_locations.keywords", DEFAULT_SERVICE_DELIVERY_KEYWORDS,
+        ),
+        description_keywords=_cfg_list(
+            metadata_prompt, "field.description.keywords", DEFAULT_DESCRIPTION_KEYWORDS,
+        ),
+        verbatim_scope_keywords=_cfg_list(
+            metadata_prompt, "field.verbatim_scope.keywords", DEFAULT_VERBATIM_SCOPE_KEYWORDS,
+        ),
+        scope_ref_keywords=_cfg_list(
+            metadata_prompt, "field.scope_section_reference.keywords", DEFAULT_SCOPE_REF_KEYWORDS,
         ),
     )
 
@@ -552,7 +653,7 @@ def _summary_from_scope(scope_text: str) -> str:
     return first_sentence[:300] if first_sentence else scope_text[:300]
 
 
-def _extract_contract_classification(text: str) -> ContractClassification:
+def _extract_contract_classification(text: str, config: ParserRuntimeConfig | None = None) -> ContractClassification:
     lower = text.lower()
     type_keywords = {
         "Services – Advisory": ["consulting", "advisory", "professional services", "legal", "audit"],
@@ -622,47 +723,48 @@ def _extract_clause_groups(
     return out
 
 
-def _extract_contract_details(text: str, sections: List[Section]) -> ContractDetails:
-    effective_date = _first_match(
-        [
-            r"effective date\s*[:\-]?\s*([A-Za-z0-9,\-\/ ]{5,40})",
-            r"commencement date\s*[:\-]?\s*([A-Za-z0-9,\-\/ ]{5,40})",
-        ],
-        text,
-    )
-    expiration_date = _first_match(
-        [
-            r"expiration date\s*[:\-]?\s*([A-Za-z0-9,\-\/ ]{5,40})",
-            r"expires?\s+on\s+([A-Za-z0-9,\-\/ ]{5,40})",
-        ],
-        text,
-    )
-    term_duration = _first_match(
-        [
-            r"term(?:\s+of)?\s+(?:shall be|is|for)?\s*([^.\n]{5,80})",
-            r"duration\s*[:\-]?\s*([^.\n]{5,80})",
-        ],
-        text,
-    )
+def _extract_contract_details(
+    text: str, sections: List[Section], config: ParserRuntimeConfig | None = None,
+) -> ContractDetails:
+    eff_kw = config.effective_date_keywords if config else DEFAULT_EFFECTIVE_DATE_KEYWORDS
+    eff_patterns = [rf"{re.escape(kw)}\s*[:\-]?\s*([A-Za-z0-9,\-\/ ]{{5,40}})" for kw in eff_kw[:4]]
+    effective_date = _first_match(eff_patterns, text) if eff_patterns else NOT_FOUND
 
-    renewal_clause = _match_clause(sections, ["renewal", "renew", "extension", "auto-renew"])[0]
+    exp_kw = config.expiration_date_keywords if config else DEFAULT_EXPIRATION_DATE_KEYWORDS
+    exp_patterns = [rf"{re.escape(kw)}\s*[:\-]?\s*([A-Za-z0-9,\-\/ ]{{5,40}})" for kw in exp_kw[:4]]
+    expiration_date = _first_match(exp_patterns, text) if exp_patterns else NOT_FOUND
+
+    dur_kw = config.term_duration_keywords if config else DEFAULT_TERM_DURATION_KEYWORDS
+    dur_patterns = [rf"{re.escape(kw)}\s*[:\-]?\s*([^.\n]{{5,80}})" for kw in dur_kw[:4]]
+    term_duration = _first_match(dur_patterns, text) if dur_patterns else NOT_FOUND
+
+    ren_kw = config.renewal_keywords if config else DEFAULT_RENEWAL_KEYWORDS
+    renewal_clause = _match_clause(sections, ren_kw)[0]
     renewal_provisions = _summary_from_scope(renewal_clause)
 
-    estimated_value = _first_match(
-        [
-            r"(?:contract value|total value|estimated value|total fees?)\s*[:\-]?\s*([^\n.]{3,80})",
-            r"(USD|EUR|GBP|AED|SAR|QAR|KWD|OMR|BHD|INR|US\$|\$|€|£)\s?([0-9][0-9,\.]{2,})",
-        ],
-        text,
+    val_kw = config.estimated_value_keywords if config else DEFAULT_ESTIMATED_VALUE_KEYWORDS
+    val_patterns = [rf"(?:{re.escape(kw)})\s*[:\-]?\s*([^\n.]{{3,80}})" for kw in val_kw[:4]]
+    val_patterns.append(
+        r"(USD|EUR|GBP|AED|SAR|QAR|KWD|OMR|BHD|INR|US\$|\$|€|£)\s?([0-9][0-9,\.]{2,})"
     )
+    estimated_value = _first_match(val_patterns, text)
+
+    pay_kw = config.payment_currency_keywords if config else DEFAULT_PAYMENT_CURRENCY_KEYWORDS
     payment_currency = _extract_currency(
-        _match_clause(sections, ["payment", "invoice", "fee", "currency"])[0]
+        _match_clause(sections, pay_kw)[0]
     )
     if payment_currency == NOT_FOUND:
         payment_currency = _extract_currency(text)
 
+    title_kw = config.title_keywords if config else DEFAULT_TITLE_KEYWORDS
+    title = _extract_title(text)
+    if title == NOT_FOUND:
+        title_clause = _match_clause(sections, title_kw)[0]
+        if title_clause != NOT_FOUND:
+            title = title_clause[:180]
+
     return ContractDetails(
-        title=_extract_title(text),
+        title=title,
         effective_date=effective_date,
         term_duration=term_duration,
         renewal_provisions=renewal_provisions,
@@ -954,29 +1056,40 @@ def parse_contract(
     if buyer_jurisdiction == NOT_FOUND:
         buyer_jurisdiction = _extract_country(gov_clause)
 
-    svc_location_clause = clause_groups["Service-related clauses"][1].text
+    svc_loc_kw = runtime_config.service_delivery_keywords
+    svc_location_text = _match_clause(sections, svc_loc_kw)[0]
+    if svc_location_text == NOT_FOUND:
+        svc_location_text = clause_groups["Service-related clauses"][1].text
     locations = [
         c
         for c in COUNTRIES
-        if re.search(rf"\b{re.escape(c)}\b", svc_location_clause, flags=re.IGNORECASE)
+        if re.search(rf"\b{re.escape(c)}\b", svc_location_text, flags=re.IGNORECASE)
     ]
 
+    desc_kw = runtime_config.description_keywords
+    scope_kw = runtime_config.verbatim_scope_keywords
     scope_clause = clause_groups["Service-related clauses"][0]
+    desc_text = _match_clause(sections, desc_kw)[0]
+    if desc_text == NOT_FOUND:
+        desc_text = scope_clause.text
+    verbatim_text = _match_clause(sections, scope_kw)[0]
+    if verbatim_text == NOT_FOUND:
+        verbatim_text = scope_clause.text
     nature = NatureOfSupply(
-        description=_summary_from_scope(scope_clause.text),
-        verbatim_scope=scope_clause.text,
+        description=_summary_from_scope(desc_text),
+        verbatim_scope=verbatim_text,
         scope_section_reference=scope_clause.reference,
     )
 
     result = ExtractionResult(
-        contract_classification=_extract_contract_classification(cleaned),
+        contract_classification=_extract_contract_classification(cleaned, runtime_config),
         parties=parties,
         jurisdictions=Jurisdictions(
             supplier_jurisdiction=supplier_jurisdiction,
             buyer_jurisdiction=buyer_jurisdiction,
             service_delivery_locations=locations,
         ),
-        contract_details=_extract_contract_details(cleaned, sections),
+        contract_details=_extract_contract_details(cleaned, sections, runtime_config),
         nature_of_supply=nature,
         clause_groups=clause_groups,
         ocr_used=ocr_used,

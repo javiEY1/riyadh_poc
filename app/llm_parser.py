@@ -282,23 +282,46 @@ def _build_evidence_from_llm(
     return evidence
 
 
+def _build_field_hints(metadata_prompt: str | None) -> str:
+    if not metadata_prompt:
+        return ""
+    hints: list[str] = []
+    for match in re.finditer(
+        r"^\s*(field\.[a-z_]+\.keywords)\s*=\s*(.+)$",
+        metadata_prompt,
+        flags=re.IGNORECASE | re.MULTILINE,
+    ):
+        key = match.group(1).strip()
+        value = match.group(2).strip()
+        hints.append(f"- {key}: {value}")
+    if not hints:
+        return ""
+    return (
+        "\n\nAdditional field extraction guidance from configuration:\n"
+        + "\n".join(hints)
+    )
+
+
 async def parse_contract_with_llm(
     text: str,
     api_key: str,
     ocr_used: bool = False,
     model: str = "gpt-4o-mini",
+    metadata_prompt: str | None = None,
 ) -> ExtractionResult:
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(api_key=api_key)
 
     truncated = text[:12000] if len(text) > 12000 else text
+    field_hints = _build_field_hints(metadata_prompt)
+    system_content = SYSTEM_PROMPT + field_hints
 
     response = await client.chat.completions.create(
         model=model,
         temperature=0.1,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_content},
             {"role": "user", "content": f"Extract metadata from this contract:\n\n{truncated}"},
         ],
     )
