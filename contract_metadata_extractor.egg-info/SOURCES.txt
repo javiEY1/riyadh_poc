@@ -1,0 +1,13 @@
+pyproject.toml
+app/__init__.py
+app/extractor.py
+app/main.py
+app/models.py
+app/parser.py
+contract_metadata_extractor.egg-info/PKG-INFO
+contract_metadata_extractor.egg-info/SOURCES.txt
+contract_metadata_extractor.egg-info/dependency_links.txt
+contract_metadata_extractor.egg-info/requires.txt
+contract_metadata_extractor.egg-info/top_level.txt
+tests/test_api.py
+tests/test_parser.py

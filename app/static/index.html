@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contract Metadata Extractor</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; max-width: 900px; }
+      h1 { margin-bottom: 0.25rem; }
+      .card { border: 1px solid #ddd; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+      button { padding: 0.5rem 1rem; cursor: pointer; }
+      pre { background: #111; color: #f5f5f5; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+      .error { color: #b00020; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Contract Metadata Extractor</h1>
+    <p>Upload a contract file to extract metadata and the requested clause library.</p>
+
+    <div class="card">
+      <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.tif,.tiff,.bmp" />
+      <button id="extractBtn">Extract</button>
+      <p id="status"></p>
+      <p class="error" id="error"></p>
+      <pre id="output"></pre>
+    </div>
+
+    <script>
+      const btn = document.getElementById("extractBtn");
+      const fileInput = document.getElementById("fileInput");
+      const statusEl = document.getElementById("status");
+      const errorEl = document.getElementById("error");
+      const outputEl = document.getElementById("output");
+
+      btn.addEventListener("click", async () => {
+        const file = fileInput.files[0];
+        errorEl.textContent = "";
+        outputEl.textContent = "";
+        if (!file) {
+          errorEl.textContent = "Please select a contract file.";
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        statusEl.textContent = "Extracting...";
+        try {
+          const response = await fetch("/extract", { method: "POST", body: formData });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.detail || "Extraction failed");
+          }
+          outputEl.textContent = JSON.stringify(data, null, 2);
+          statusEl.textContent = "Done";
+        } catch (error) {
+          statusEl.textContent = "";
+          errorEl.textContent = error.message;
+        }
+      });
+    </script>
+  </body>
+  </html>
