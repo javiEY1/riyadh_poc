@@ -1,16 +1,12 @@
-<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="g1" x1="12" y1="10" x2="116" y2="118" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#E6D4FF" />
-      <stop offset="1" stop-color="#9A67E5" />
-    </linearGradient>
-    <linearGradient id="g2" x1="28" y1="26" x2="92" y2="96" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF" stop-opacity="0.95" />
-      <stop offset="1" stop-color="#D8B8FF" stop-opacity="0.95" />
-    </linearGradient>
-  </defs>
-
-  <rect x="6" y="6" width="116" height="116" rx="26" fill="url(#g1)"/>
-  <path d="M29 80L64 34L99 80H83L64 55L45 80H29Z" fill="url(#g2)"/>
-  <path d="M39 92H89" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="6" stroke-linecap="round"/>
+<svg width="500" height="130" viewBox="0 0 500 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Oval mark -->
+  <ellipse cx="52" cy="58" rx="38" ry="48" stroke="#2D1250" stroke-width="5" fill="none"/>
+  <!-- Stylised R tail -->
+  <path d="M52 18 C52 18 40 45 40 65 C40 85 52 106 52 106" stroke="#2D1250" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+  <path d="M52 50 C60 42 70 38 76 44 C82 50 74 60 52 65" stroke="#2D1250" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+  <path d="M65 55 L82 106" stroke="#2D1250" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+  <!-- RIYADH AIR text -->
+  <text x="108" y="68" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="46" font-weight="700" fill="#2D1250" letter-spacing="3">RIYADH AIR</text>
+  <!-- Arabic text -->
+  <text x="108" y="108" font-family="'Segoe UI','Tahoma','Arial',sans-serif" font-size="30" font-weight="600" fill="#2D1250" letter-spacing="1" direction="rtl">&#x0637;&#x064A;&#x0631;&#x0627;&#x0646; &#x0627;&#x0644;&#x0631;&#x064A;&#x0627;&#x0636;</text>
 </svg>
