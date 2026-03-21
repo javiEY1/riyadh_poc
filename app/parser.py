@@ -303,6 +303,13 @@ def _extract_currency(text: str) -> str:
     return NOT_FOUND
 
 
+DEFAULT_NAME_KEYWORDS = ["between", "by and between", "party", "parties", "hereinafter"]
+DEFAULT_ADDRESS_KEYWORDS = [
+    "registered office", "registered address", "principal place of business", "address",
+]
+DEFAULT_PARTY_JURISDICTION_KEYWORDS = ["incorporated in", "organized under", "laws of", "jurisdiction"]
+
+
 @dataclass
 class ParserRuntimeConfig:
     supplier_role_terms: List[str]
@@ -310,6 +317,12 @@ class ParserRuntimeConfig:
     legal_entity_markers: List[str]
     entity_stop_phrases: List[str]
     clause_overrides: Dict[str, List[str]]
+    buyer_name_keywords: List[str]
+    supplier_name_keywords: List[str]
+    buyer_address_keywords: List[str]
+    supplier_address_keywords: List[str]
+    buyer_jurisdiction_keywords: List[str]
+    supplier_jurisdiction_keywords: List[str]
 
 
 def _split_csv(value: str) -> List[str]:
@@ -353,6 +366,24 @@ def _build_runtime_config(metadata_prompt: str | None) -> ParserRuntimeConfig:
             list(DEFAULT_ENTITY_STOP_PHRASES),
         ),
         clause_overrides=_parse_clause_overrides(metadata_prompt),
+        buyer_name_keywords=_cfg_list(
+            metadata_prompt, "field.buyer_name.keywords", DEFAULT_NAME_KEYWORDS,
+        ),
+        supplier_name_keywords=_cfg_list(
+            metadata_prompt, "field.supplier_name.keywords", DEFAULT_NAME_KEYWORDS,
+        ),
+        buyer_address_keywords=_cfg_list(
+            metadata_prompt, "field.buyer_registered_address.keywords", DEFAULT_ADDRESS_KEYWORDS,
+        ),
+        supplier_address_keywords=_cfg_list(
+            metadata_prompt, "field.supplier_registered_address.keywords", DEFAULT_ADDRESS_KEYWORDS,
+        ),
+        buyer_jurisdiction_keywords=_cfg_list(
+            metadata_prompt, "field.buyer_party_jurisdiction.keywords", DEFAULT_PARTY_JURISDICTION_KEYWORDS,
+        ),
+        supplier_jurisdiction_keywords=_cfg_list(
+            metadata_prompt, "field.supplier_party_jurisdiction.keywords", DEFAULT_PARTY_JURISDICTION_KEYWORDS,
+        ),
     )
 
 
@@ -407,13 +438,59 @@ def _map_role(role_raw: str, config: ParserRuntimeConfig) -> str:
     return "Other"
 
 
-def _add_party(parties: List[Party], raw_name: str, role: str, config: ParserRuntimeConfig) -> None:
+def _extract_address_near(text: str, entity_name: str, keywords: List[str]) -> str:
+    if not entity_name or entity_name == NOT_FOUND:
+        return NOT_FOUND
+    name_idx = text.lower().find(entity_name.lower()[:60])
+    if name_idx == -1:
+        return NOT_FOUND
+    window = text[name_idx : name_idx + 600]
+    for kw in keywords:
+        pat = rf"{re.escape(kw)}\s*[:\-]?\s*([^\n;]{{5,200}})"
+        m = re.search(pat, window, flags=re.IGNORECASE)
+        if m:
+            return m.group(1).strip(" ,.;:")[:200]
+    return NOT_FOUND
+
+
+def _extract_jurisdiction_near(text: str, entity_name: str, keywords: List[str]) -> str:
+    if not entity_name or entity_name == NOT_FOUND:
+        return _extract_country(text)
+    name_idx = text.lower().find(entity_name.lower()[:60])
+    if name_idx == -1:
+        return _extract_country(text)
+    window = text[name_idx : name_idx + 600]
+    for kw in keywords:
+        pat = rf"{re.escape(kw)}\s*[:\-]?\s*(?:the\s+)?([^\n;,]{{3,100}})"
+        m = re.search(pat, window, flags=re.IGNORECASE)
+        if m:
+            country = _extract_country(m.group(1))
+            if country != NOT_FOUND:
+                return country
+    return _extract_country(window)
+
+
+def _add_party(
+    parties: List[Party],
+    raw_name: str,
+    role: str,
+    config: ParserRuntimeConfig,
+    full_text: str = "",
+) -> None:
     name = _clean_party_name(raw_name)
     if not _is_probable_entity_name(name, config):
         return
     if any(p.name.lower() == name.lower() and p.role == role for p in parties):
         return
-    parties.append(Party(name=name, role=role, jurisdiction=_extract_country(name)))
+    if role == "Buyer/Client":
+        addr_kw = config.buyer_address_keywords
+        jur_kw = config.buyer_jurisdiction_keywords
+    else:
+        addr_kw = config.supplier_address_keywords
+        jur_kw = config.supplier_jurisdiction_keywords
+    address = _extract_address_near(full_text, name, addr_kw) if full_text else NOT_FOUND
+    jurisdiction = _extract_jurisdiction_near(full_text, name, jur_kw) if full_text else _extract_country(name)
+    parties.append(Party(name=name, role=role, registered_address=address, jurisdiction=jurisdiction))
 
 
 def _extract_parties(text: str, config: ParserRuntimeConfig) -> List[Party]:
@@ -435,7 +512,7 @@ def _extract_parties(text: str, config: ParserRuntimeConfig) -> List[Party]:
     ]
     for pattern, role in labeled_patterns:
         for hit in re.finditer(pattern, intro, flags=re.IGNORECASE):
-            _add_party(parties, hit.group(1), role, config)
+            _add_party(parties, hit.group(1), role, config, full_text=text)
 
     role_terms = config.buyer_role_terms + config.supplier_role_terms
     role_terms_pattern = "|".join(re.escape(term) for term in sorted(role_terms, key=len, reverse=True))
@@ -445,7 +522,7 @@ def _extract_parties(text: str, config: ParserRuntimeConfig) -> List[Party]:
         flags=re.IGNORECASE,
     )
     for hit in role_hits:
-        _add_party(parties, hit.group(1), _map_role(hit.group(2), config), config)
+        _add_party(parties, hit.group(1), _map_role(hit.group(2), config), config, full_text=text)
 
     flat_intro = re.sub(r"\s+", " ", intro)
     supplier_between_pattern = "|".join(re.escape(term) for term in config.supplier_role_terms)
@@ -462,8 +539,8 @@ def _extract_parties(text: str, config: ParserRuntimeConfig) -> List[Party]:
             else "Buyer/Client"
         )
         second_role = "Supplier/Vendor" if first_role == "Buyer/Client" else "Buyer/Client"
-        _add_party(parties, first, first_role, config)
-        _add_party(parties, second, second_role, config)
+        _add_party(parties, first, first_role, config, full_text=text)
+        _add_party(parties, second, second_role, config, full_text=text)
 
     return parties[:4]
 
