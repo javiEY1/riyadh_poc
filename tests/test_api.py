@@ -101,3 +101,52 @@ def test_export_json_and_excel() -> None:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     assert excel_export.content[:2] == b"PK"
+
+
+def test_template_upload_list_and_match() -> None:
+    payload = b"""
+    MASTER SERVICE AGREEMENT TEMPLATE
+    Between [BUYER NAME] (Buyer) and [SUPPLIER NAME] (Supplier).
+    Effective date: [DATE].
+    Scope of Services: Advisory and consulting services in Saudi Arabia.
+    Payment terms: Fees in SAR. Invoices monthly.
+    Governing law: Kingdom of Saudi Arabia.
+    """
+    upload_res = client.post(
+        "/templates",
+        files={"file": ("template.txt", payload, "text/plain")},
+        data={"name": "Advisory Template"},
+    )
+    assert upload_res.status_code == 200
+    tpl_data = upload_res.json()
+    assert "template_id" in tpl_data
+    assert tpl_data["template_name"] == "Advisory Template"
+
+    list_res = client.get("/templates")
+    assert list_res.status_code == 200
+    tpls = list_res.json()
+    assert any(t["name"] == "Advisory Template" for t in tpls)
+
+    detail_res = client.get(f"/templates/{tpl_data['template_id']}")
+    assert detail_res.status_code == 200
+    assert "result" in detail_res.json()
+
+    contract = b"""
+    SERVICE AGREEMENT
+    Between Riyadh Air LLC (Buyer) and Acme Consulting Ltd (Supplier).
+    Effective date: 01 Jan 2026.
+    Scope of Services: Advisory and consulting services in Saudi Arabia.
+    Payment terms: Fees in SAR. Invoices monthly.
+    Governing law: Kingdom of Saudi Arabia.
+    """
+    extract_res = client.post("/extract", files={"file": ("contract.txt", contract, "text/plain")})
+    assert extract_res.status_code == 200
+    extracted = extract_res.json()
+
+    match_res = client.post("/templates/match", json=extracted)
+    assert match_res.status_code == 200
+    matches = match_res.json()
+    assert len(matches) >= 1
+    assert "similarity" in matches[0]
+    assert "template_name" in matches[0]
+    assert matches[0]["similarity"] > 0

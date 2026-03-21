@@ -4,19 +4,20 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal, Document, init_db, save_document
+from app.database import AsyncSessionLocal, Document, Template, init_db, save_document, save_template
 from app.extractor import extract_text
 from app.exporter import build_excel_bytes, build_json_bytes
 from app.llm_parser import parse_contract_with_llm
 from app.metadata_prompt import load_metadata_prompt
 from app.models import ExtractionResult
 from app.parser import parse_contract
+from app.template_matcher import rank_templates
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,80 @@ async def get_document(doc_id: int) -> dict:
         if not doc:
             raise HTTPException(status_code=404, detail="Document not found")
         return doc.to_full()
+
+
+@app.post("/templates")
+async def upload_template(
+    file: UploadFile = File(...),
+    name: str = Form(""),
+) -> dict:
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File name is required")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    text, ocr_used = extract_text(file.filename, content)
+    if not text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Could not extract text from template.",
+        )
+
+    template_name = name.strip() or file.filename
+    extraction_method = "regex"
+    metadata_prompt = load_metadata_prompt()
+
+    if _openai_api_key:
+        try:
+            result = await parse_contract_with_llm(
+                text, api_key=_openai_api_key, ocr_used=ocr_used,
+                metadata_prompt=metadata_prompt,
+            )
+            extraction_method = "llm"
+        except Exception:
+            logger.exception("LLM extraction failed for template, falling back to regex")
+            result = parse_contract(text, ocr_used=ocr_used, metadata_prompt=metadata_prompt)
+    else:
+        result = parse_contract(text, ocr_used=ocr_used, metadata_prompt=metadata_prompt)
+
+    tpl = await save_template(template_name, file.filename, result, extraction_method)
+    response_data = result.model_dump()
+    response_data["template_id"] = tpl.id
+    response_data["template_name"] = template_name
+    response_data["extraction_method"] = extraction_method
+    return response_data
+
+
+@app.get("/templates")
+async def list_templates() -> list[dict]:
+    async with AsyncSessionLocal() as session:
+        stmt = select(Template).order_by(Template.uploaded_at.desc()).limit(100)
+        rows = await session.execute(stmt)
+        return [tpl.to_summary() for tpl in rows.scalars().all()]
+
+
+@app.get("/templates/{tpl_id}")
+async def get_template(tpl_id: int) -> dict:
+    async with AsyncSessionLocal() as session:
+        tpl = await session.get(Template, tpl_id)
+        if not tpl:
+            raise HTTPException(status_code=404, detail="Template not found")
+        return tpl.to_full()
+
+
+@app.post("/templates/match")
+async def match_template(contract_result: dict) -> list[dict]:
+    async with AsyncSessionLocal() as session:
+        stmt = select(Template).order_by(Template.uploaded_at.desc()).limit(100)
+        rows = await session.execute(stmt)
+        templates = [tpl.to_full() for tpl in rows.scalars().all()]
+
+    if not templates:
+        raise HTTPException(status_code=404, detail="No templates available")
+
+    return rank_templates(contract_result, templates)
 
 
 @app.post("/export")

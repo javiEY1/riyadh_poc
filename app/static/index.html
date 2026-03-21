@@ -258,6 +258,44 @@
         font-size: 0.82rem;
         color: var(--ra-muted);
       }
+      .tpl-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }
+      .tpl-controls input[type="text"] {
+        padding: 0.45rem 0.7rem;
+        border: 1px solid #d4c4e8;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        min-width: 160px;
+      }
+      .match-results {
+        margin-top: 0.75rem;
+      }
+      .match-results table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      .match-results th, .match-results td {
+        padding: 0.5rem 0.6rem;
+        border-bottom: 1px solid #ece8f6;
+        text-align: left;
+      }
+      .match-results th { background: #f0eaf8; color: var(--ra-primary); }
+      .match-results tr { cursor: pointer; }
+      .match-results tr:hover { background: #f9f5ff; }
+      .similarity-bar {
+        display: inline-block;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--ra-primary);
+        margin-right: 0.4rem;
+        vertical-align: middle;
+      }
     </style>
   </head>
   <body>
@@ -301,6 +339,14 @@
         <div class="actions">
           <button id="exportExcelBtn" type="button">Export Excel</button>
           <button id="exportJsonBtn" type="button">Export JSON</button>
+          <button id="searchTemplateBtn" type="button" style="display:none">Search Template</button>
+        </div>
+        <div class="match-results" id="matchResults" style="display:none">
+          <h3>Template Match Results</h3>
+          <table>
+            <thead><tr><th>Template</th><th>Similarity</th></tr></thead>
+            <tbody id="matchBody"></tbody>
+          </table>
         </div>
         <div class="table-wrap">
           <table>
@@ -315,6 +361,39 @@
             <tbody id="tableBody"></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="card">
+        <details>
+          <summary>Contract Templates</summary>
+          <div class="tpl-controls">
+            <input type="text" id="tplNameInput" placeholder="Template name (optional)" />
+            <input class="file-input" type="file" id="tplFileInput"
+              accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.tif,.tiff,.bmp" />
+            <button id="uploadTplBtn" type="button">Upload Template</button>
+          </div>
+          <p class="status" id="tplStatus"></p>
+          <ul class="history-list" id="templateList">
+            <li style="color:var(--ra-muted);cursor:default">No templates yet.</li>
+          </ul>
+        </details>
+      </section>
+
+      <section class="card" id="templateDetailCard" style="display:none">
+        <h2>Template Detail: <span id="templateDetailName"></span></h2>
+        <div class="meta">
+          <span class="pill" id="tplConfidence">Confidence: --</span>
+          <span class="pill" id="tplMethod">Method: --</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Value</th><th>Confidence</th><th>Level</th></tr>
+            </thead>
+            <tbody id="templateTableBody"></tbody>
+          </table>
+        </div>
+        <button id="closeTplDetail" type="button" style="margin-top:0.75rem">Close</button>
       </section>
 
       <section class="card">
@@ -369,6 +448,7 @@
           }
         } catch (_) { /* ignore */ }
         loadHistory();
+        loadTemplates();
       })();
 
       saveKeyBtn.addEventListener("click", async () => {
@@ -427,6 +507,7 @@
           methodBadgeEl.textContent = `Method: ${escapeHtml(doc.extraction_method || "regex")}`;
           resultsCard.style.display = "block";
           lastResult = data;
+          updateSearchBtn();
           statusEl.textContent = `Loaded: ${escapeHtml(doc.filename)}`;
         } catch (e) {
           errorEl.textContent = "Failed to load document: " + e.message;
@@ -465,88 +546,7 @@
       }
 
       function renderTable(confRows, evidenceRows) {
-        tableBody.innerHTML = "";
-        if (!confRows || !confRows.length) return;
-
-        const evIdx = buildEvidenceIndex(evidenceRows);
-
-        const grouped = {};
-        for (const row of confRows) {
-          const l1 = classifyLevel1(row.section);
-          if (!grouped[l1]) grouped[l1] = {};
-          if (!grouped[l1][row.section]) grouped[l1][row.section] = [];
-          grouped[l1][row.section].push(row);
-        }
-
-        for (const [l1Name, sections] of Object.entries(grouped)) {
-          const l1Tr = document.createElement("tr");
-          l1Tr.className = "group-l1";
-          const l1Td = document.createElement("td");
-          l1Td.colSpan = 4;
-          l1Td.textContent = l1Name;
-          l1Tr.appendChild(l1Td);
-          tableBody.appendChild(l1Tr);
-
-          const l1Children = [];
-
-          for (const [secName, secRows] of Object.entries(sections)) {
-            const l2Tr = document.createElement("tr");
-            l2Tr.className = "group-l2";
-            const l2Td = document.createElement("td");
-            l2Td.colSpan = 4;
-            l2Td.textContent = secName;
-            l2Tr.appendChild(l2Td);
-            tableBody.appendChild(l2Tr);
-            l1Children.push(l2Tr);
-
-            const l2Children = [];
-            for (const row of secRows) {
-              const tr = document.createElement("tr");
-              tr.className = "evidence-row";
-              const levelClass = `level-${String(row.confidence_level || "").toLowerCase()}`;
-              tr.innerHTML = `
-                <td>${escapeHtml(row.field)}</td>
-                <td>${escapeHtml(row.value)}</td>
-                <td>${escapeHtml(row.confidence_score)}</td>
-                <td class="${levelClass}">${escapeHtml(row.confidence_level)}</td>
-              `;
-              tableBody.appendChild(tr);
-              l1Children.push(tr);
-              l2Children.push(tr);
-
-              const ev = evIdx[`${row.section}|||${row.field}`];
-              const snippetTr = document.createElement("tr");
-              snippetTr.className = "snippet-row";
-              const snippetTd = document.createElement("td");
-              snippetTd.colSpan = 4;
-              if (ev && ev.snippet && ev.snippet !== "NOT FOUND IN CONTRACT") {
-                snippetTd.innerHTML = `<div class="snippet-box">${highlightSnippet(ev.snippet, ev.highlight_terms)}</div>`;
-              } else {
-                snippetTd.innerHTML = `<div class="snippet-box" style="color:var(--ra-muted);font-style:italic">No matching snippet found in the contract.</div>`;
-              }
-              snippetTr.appendChild(snippetTd);
-              tableBody.appendChild(snippetTr);
-              l1Children.push(snippetTr);
-              l2Children.push(snippetTr);
-
-              tr.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const isOpen = tr.classList.toggle("open");
-                snippetTr.classList.toggle("open", isOpen);
-              });
-            }
-
-            l2Tr.addEventListener("click", () => {
-              const collapsed = l2Tr.classList.toggle("collapsed");
-              l2Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
-            });
-          }
-
-          l1Tr.addEventListener("click", () => {
-            const collapsed = l1Tr.classList.toggle("collapsed");
-            l1Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
-          });
-        }
+        renderTableInto(tableBody, confRows, evidenceRows);
       }
 
       function escapeRegex(value) {
@@ -639,12 +639,206 @@
       });
 
       const methodBadgeEl = document.getElementById("methodBadge");
+      const searchTemplateBtn = document.getElementById("searchTemplateBtn");
+      const matchResults = document.getElementById("matchResults");
+      const matchBody = document.getElementById("matchBody");
+      const uploadTplBtn = document.getElementById("uploadTplBtn");
+      const tplFileInput = document.getElementById("tplFileInput");
+      const tplNameInput = document.getElementById("tplNameInput");
+      const tplStatus = document.getElementById("tplStatus");
+      const templateList = document.getElementById("templateList");
+      const templateDetailCard = document.getElementById("templateDetailCard");
+      const templateDetailName = document.getElementById("templateDetailName");
+      const templateTableBody = document.getElementById("templateTableBody");
+      const tplConfidence = document.getElementById("tplConfidence");
+      const tplMethod = document.getElementById("tplMethod");
+      const closeTplDetail = document.getElementById("closeTplDetail");
+      let hasTemplates = false;
+
+      async function loadTemplates() {
+        try {
+          const res = await fetch("/templates");
+          const tpls = await res.json();
+          templateList.innerHTML = "";
+          hasTemplates = tpls.length > 0;
+          updateSearchBtn();
+          if (!tpls.length) {
+            templateList.innerHTML = '<li style="color:var(--ra-muted);cursor:default">No templates yet.</li>';
+            return;
+          }
+          for (const tpl of tpls) {
+            const li = document.createElement("li");
+            const date = tpl.uploaded_at ? new Date(tpl.uploaded_at).toLocaleString() : "";
+            li.innerHTML = `
+              <span class="hist-name">${escapeHtml(tpl.name)}</span>
+              <span class="hist-meta">
+                <span>${escapeHtml(tpl.extraction_method)}</span>
+                <span>${escapeHtml(date)}</span>
+              </span>
+            `;
+            li.addEventListener("click", () => loadTemplateDetail(tpl.id));
+            templateList.appendChild(li);
+          }
+        } catch (_) { /* ignore */ }
+      }
+
+      async function loadTemplateDetail(id) {
+        try {
+          const res = await fetch(`/templates/${id}`);
+          const tpl = await res.json();
+          templateDetailName.textContent = escapeHtml(tpl.name);
+          const data = tpl.result;
+          const overall = typeof data.overall_confidence === "number"
+            ? `${Math.round(data.overall_confidence * 100)}%` : "--";
+          tplConfidence.textContent = `Confidence: ${overall}`;
+          tplMethod.textContent = `Method: ${escapeHtml(tpl.extraction_method || "regex")}`;
+          renderTableInto(templateTableBody, data.confidence_table || [], data.evidence_table || []);
+          templateDetailCard.style.display = "block";
+          templateDetailCard.scrollIntoView({ behavior: "smooth" });
+        } catch (e) {
+          errorEl.textContent = "Failed to load template: " + e.message;
+        }
+      }
+
+      closeTplDetail.addEventListener("click", () => {
+        templateDetailCard.style.display = "none";
+      });
+
+      function renderTableInto(tbody, confRows, evidenceRows) {
+        tbody.innerHTML = "";
+        if (!confRows || !confRows.length) return;
+        const evIdx = buildEvidenceIndex(evidenceRows);
+        const grouped = {};
+        for (const row of confRows) {
+          const l1 = classifyLevel1(row.section);
+          if (!grouped[l1]) grouped[l1] = {};
+          if (!grouped[l1][row.section]) grouped[l1][row.section] = [];
+          grouped[l1][row.section].push(row);
+        }
+        for (const [l1Name, sections] of Object.entries(grouped)) {
+          const l1Tr = document.createElement("tr");
+          l1Tr.className = "group-l1";
+          const l1Td = document.createElement("td");
+          l1Td.colSpan = 4;
+          l1Td.textContent = l1Name;
+          l1Tr.appendChild(l1Td);
+          tbody.appendChild(l1Tr);
+          const l1Children = [];
+          for (const [secName, secRows] of Object.entries(sections)) {
+            const l2Tr = document.createElement("tr");
+            l2Tr.className = "group-l2";
+            const l2Td = document.createElement("td");
+            l2Td.colSpan = 4;
+            l2Td.textContent = secName;
+            l2Tr.appendChild(l2Td);
+            tbody.appendChild(l2Tr);
+            l1Children.push(l2Tr);
+            const l2Children = [];
+            for (const row of secRows) {
+              const tr = document.createElement("tr");
+              tr.className = "evidence-row";
+              const levelClass = `level-${String(row.confidence_level || "").toLowerCase()}`;
+              tr.innerHTML = `
+                <td>${escapeHtml(row.field)}</td>
+                <td>${escapeHtml(row.value)}</td>
+                <td>${escapeHtml(row.confidence_score)}</td>
+                <td class="${levelClass}">${escapeHtml(row.confidence_level)}</td>
+              `;
+              tbody.appendChild(tr);
+              l1Children.push(tr);
+              l2Children.push(tr);
+              const ev = evIdx[`${row.section}|||${row.field}`];
+              const snippetTr = document.createElement("tr");
+              snippetTr.className = "snippet-row";
+              const snippetTd = document.createElement("td");
+              snippetTd.colSpan = 4;
+              if (ev && ev.snippet && ev.snippet !== "NOT FOUND IN CONTRACT") {
+                snippetTd.innerHTML = `<div class="snippet-box">${highlightSnippet(ev.snippet, ev.highlight_terms)}</div>`;
+              } else {
+                snippetTd.innerHTML = `<div class="snippet-box" style="color:var(--ra-muted);font-style:italic">No matching snippet found.</div>`;
+              }
+              snippetTr.appendChild(snippetTd);
+              tbody.appendChild(snippetTr);
+              l1Children.push(snippetTr);
+              l2Children.push(snippetTr);
+              tr.addEventListener("click", (e) => {
+                e.stopPropagation();
+                tr.classList.toggle("open");
+                snippetTr.classList.toggle("open", tr.classList.contains("open"));
+              });
+            }
+            l2Tr.addEventListener("click", () => {
+              const collapsed = l2Tr.classList.toggle("collapsed");
+              l2Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
+            });
+          }
+          l1Tr.addEventListener("click", () => {
+            const collapsed = l1Tr.classList.toggle("collapsed");
+            l1Children.forEach(r => r.classList.toggle("hidden-row", collapsed));
+          });
+        }
+      }
+
+      uploadTplBtn.addEventListener("click", async () => {
+        const file = tplFileInput.files[0];
+        if (!file) { tplStatus.textContent = "Select a file first."; return; }
+        const formData = new FormData();
+        formData.append("file", file);
+        const name = tplNameInput.value.trim();
+        if (name) formData.append("name", name);
+        tplStatus.textContent = "Uploading and analyzing template...";
+        try {
+          const res = await fetch("/templates", { method: "POST", body: formData });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || "Upload failed");
+          tplStatus.textContent = `Template "${escapeHtml(data.template_name)}" uploaded.`;
+          tplNameInput.value = "";
+          tplFileInput.value = "";
+          loadTemplates();
+        } catch (e) {
+          tplStatus.textContent = "Error: " + e.message;
+        }
+      });
+
+      function updateSearchBtn() {
+        searchTemplateBtn.style.display = (lastResult && hasTemplates) ? "inline-block" : "none";
+      }
+
+      searchTemplateBtn.addEventListener("click", async () => {
+        if (!lastResult) return;
+        matchResults.style.display = "none";
+        matchBody.innerHTML = "";
+        try {
+          const res = await fetch("/templates/match", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(lastResult),
+          });
+          const matches = await res.json();
+          if (!res.ok) throw new Error(matches.detail || "Match failed");
+          for (const m of matches) {
+            const pct = Math.round(m.similarity * 100);
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${escapeHtml(m.template_name)}</td>
+              <td><span class="similarity-bar" style="width:${pct}px"></span>${pct}%</td>
+            `;
+            tr.addEventListener("click", () => loadTemplateDetail(m.template_id));
+            matchBody.appendChild(tr);
+          }
+          matchResults.style.display = "block";
+        } catch (e) {
+          errorEl.textContent = "Template match error: " + e.message;
+        }
+      });
 
       btn.addEventListener("click", async () => {
         const file = fileInput.files[0];
         errorEl.textContent = "";
         tableBody.innerHTML = "";
         resultsCard.style.display = "none";
+        matchResults.style.display = "none";
+        matchBody.innerHTML = "";
         overallConfidenceEl.textContent = "Overall confidence: --";
         ocrBadgeEl.textContent = "OCR used: --";
         methodBadgeEl.textContent = "Method: --";
@@ -676,6 +870,7 @@
           resultsCard.style.display = "block";
           lastResult = data;
           statusEl.textContent = "Analysis completed.";
+          updateSearchBtn();
           loadHistory();
         } catch (error) {
           statusEl.textContent = "";
