@@ -475,6 +475,76 @@
         color: var(--ra-muted);
         font-style: italic;
       }
+      .compare-data-row {
+        cursor: pointer;
+      }
+      .compare-data-row:hover { background: var(--ra-hover); }
+      .compare-data-row td:first-child::before {
+        content: "\25B6";
+        display: inline-block;
+        margin-right: 0.35rem;
+        font-size: 0.55rem;
+        transition: transform 0.15s;
+        color: var(--ra-muted);
+      }
+      .compare-data-row.open td:first-child::before {
+        transform: rotate(90deg);
+        color: var(--ra-primary);
+      }
+      .compare-detail-row { display: none; }
+      .compare-detail-row.open { display: table-row; }
+      .compare-detail-row td { padding: 0; }
+      .compare-detail-panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+        border-top: 1px solid var(--ra-border);
+      }
+      .compare-detail-panel {
+        padding: 1rem 1.25rem;
+        font-size: 0.84rem;
+        line-height: 1.65;
+        min-height: 48px;
+      }
+      .compare-detail-panel:first-child {
+        border-right: 1px solid var(--ra-border);
+      }
+      .compare-detail-panel-label {
+        font-size: 0.72rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ra-muted);
+        margin-bottom: 0.4rem;
+      }
+      .compare-detail-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--ra-text);
+      }
+      .compare-detail-snippet {
+        margin-top: 0.6rem;
+        padding: 0.7rem 0.9rem;
+        background: #faf8f5;
+        border-left: 3px solid var(--ra-primary);
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.8rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #4a4541;
+      }
+      .compare-detail-snippet mark {
+        background: #d6c9a8;
+        color: #2c2420;
+        padding: 0.1rem 0.2rem;
+        font-weight: 600;
+      }
+      .compare-detail-empty {
+        color: var(--ra-muted);
+        font-style: italic;
+        font-size: 0.82rem;
+      }
     </style>
   </head>
   <body>
@@ -1107,6 +1177,31 @@
         }
       }
 
+      function buildDetailPanel(label, clauseText, snippet, highlights) {
+        let html = `<div class="compare-detail-panel">`;
+        html += `<div class="compare-detail-panel-label">${escapeHtml(label)}</div>`;
+
+        const hasClause = clauseText && clauseText !== "NOT FOUND IN CONTRACT";
+        const hasSnippet = snippet && snippet !== "NOT FOUND IN CONTRACT";
+
+        if (hasClause) {
+          html += `<div class="compare-detail-text">${escapeHtml(clauseText)}</div>`;
+        }
+        if (hasSnippet) {
+          html += `<div class="compare-detail-snippet">${highlightSnippet(snippet, highlights || [])}</div>`;
+        }
+        if (!hasClause && !hasSnippet) {
+          html += `<div class="compare-detail-empty">No extracted content available</div>`;
+        }
+        html += `</div>`;
+        return html;
+      }
+
+      function hasDetailContent(f) {
+        return f.contract_clause_text || f.template_clause_text ||
+               f.contract_snippet || f.template_snippet;
+      }
+
       function renderComparison(diff) {
         compareTplName.textContent = diff.template_name || "";
         const overallPct = Math.round((diff.overall_similarity || 0) * 100);
@@ -1132,6 +1227,8 @@
           const childRows = [];
           for (const f of fields) {
             const tr = document.createElement("tr");
+            const expandable = hasDetailContent(f);
+            tr.className = expandable ? "compare-data-row" : "";
             const simPct = Math.round(f.similarity * 100);
             const NOT_FOUND_STR = "NOT FOUND IN CONTRACT";
 
@@ -1151,6 +1248,32 @@
             `;
             compareBody.appendChild(tr);
             childRows.push(tr);
+
+            if (expandable) {
+              const detailTr = document.createElement("tr");
+              detailTr.className = "compare-detail-row";
+              const detailTd = document.createElement("td");
+              detailTd.colSpan = 5;
+              detailTd.innerHTML = `<div class="compare-detail-panels">`
+                + buildDetailPanel("Contract",
+                    f.contract_clause_text || "",
+                    f.contract_snippet || "",
+                    f.contract_highlight || [])
+                + buildDetailPanel("Template",
+                    f.template_clause_text || "",
+                    f.template_snippet || "",
+                    f.template_highlight || [])
+                + `</div>`;
+              detailTr.appendChild(detailTd);
+              compareBody.appendChild(detailTr);
+              childRows.push(detailTr);
+
+              tr.addEventListener("click", (e) => {
+                e.stopPropagation();
+                tr.classList.toggle("open");
+                detailTr.classList.toggle("open", tr.classList.contains("open"));
+              });
+            }
           }
 
           secTr.addEventListener("click", () => {

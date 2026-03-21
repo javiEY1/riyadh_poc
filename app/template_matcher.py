@@ -64,6 +64,35 @@ def _extract_flat_values(result: dict) -> dict[str, str]:
     return flat
 
 
+def _extract_clause_texts(result: dict) -> dict[str, str]:
+    texts: dict[str, str] = {}
+    for clauses in result.get("clause_groups", {}).values():
+        for clause in clauses:
+            code = clause.get("code", "")
+            text = clause.get("text", NOT_FOUND)
+            if code:
+                texts[f"clause_{code}"] = text if text and text != NOT_FOUND else ""
+    return texts
+
+
+def _build_evidence_index(result: dict) -> dict[str, dict]:
+    idx: dict[str, dict] = {}
+    for ev in result.get("evidence_table", []):
+        key = f"{ev.get('section', '')}|||{ev.get('field', '')}"
+        idx[key] = {
+            "snippet": ev.get("snippet", ""),
+            "highlight_terms": ev.get("highlight_terms", []),
+        }
+    return idx
+
+
+def _find_evidence(evidence_idx: dict, section: str, field: str) -> dict:
+    ev = evidence_idx.get(f"{section}|||{field}")
+    if ev and ev.get("snippet") and ev["snippet"] != NOT_FOUND:
+        return ev
+    return {"snippet": "", "highlight_terms": []}
+
+
 def compute_similarity(contract_result: dict, template_result: dict) -> float:
     contract_vals = _extract_flat_values(contract_result)
     template_vals = _extract_flat_values(template_result)
@@ -126,6 +155,10 @@ def compare_detailed(
 ) -> dict:
     c_vals = _extract_flat_values(contract_result)
     t_vals = _extract_flat_values(template_result)
+    c_clause_texts = _extract_clause_texts(contract_result)
+    t_clause_texts = _extract_clause_texts(template_result)
+    c_evidence = _build_evidence_index(contract_result)
+    t_evidence = _build_evidence_index(template_result)
     all_keys = sorted(set(c_vals.keys()) | set(t_vals.keys()))
 
     rows: list[dict] = []
@@ -150,14 +183,33 @@ def compare_detailed(
         if not c_val and not t_val:
             status = "both_empty"
 
-        rows.append({
+        row: dict = {
             "section": section,
             "field": label,
             "contract_value": c_display,
             "template_value": t_display,
             "similarity": round(sim, 4),
             "status": status,
-        })
+        }
+
+        if key.startswith("clause_"):
+            c_text = c_clause_texts.get(key, "")
+            t_text = t_clause_texts.get(key, "")
+            if c_text:
+                row["contract_clause_text"] = c_text
+            if t_text:
+                row["template_clause_text"] = t_text
+
+        c_ev = _find_evidence(c_evidence, section, label)
+        t_ev = _find_evidence(t_evidence, section, label)
+        if c_ev["snippet"]:
+            row["contract_snippet"] = c_ev["snippet"]
+            row["contract_highlight"] = c_ev["highlight_terms"]
+        if t_ev["snippet"]:
+            row["template_snippet"] = t_ev["snippet"]
+            row["template_highlight"] = t_ev["highlight_terms"]
+
+        rows.append(row)
 
     overall = round(total_sim / len(all_keys), 4) if all_keys else 0.0
     return {"overall_similarity": overall, "fields": rows}
