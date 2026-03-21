@@ -11,6 +11,10 @@ Requires-Dist: python-docx>=1.1.2
 Requires-Dist: pillow>=11.1.0
 Requires-Dist: pymupdf>=1.26.0
 Requires-Dist: pytesseract>=0.3.13
+Requires-Dist: openpyxl>=3.1.5
+Requires-Dist: openai>=1.30.0
+Requires-Dist: sqlalchemy>=2.0.30
+Requires-Dist: aiosqlite>=0.20.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3.5; extra == "dev"
 Requires-Dist: httpx>=0.28.1; extra == "dev"

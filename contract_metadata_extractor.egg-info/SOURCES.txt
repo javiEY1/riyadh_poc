@@ -1,7 +1,11 @@
 pyproject.toml
 app/__init__.py
+app/database.py
+app/exporter.py
 app/extractor.py
+app/llm_parser.py
 app/main.py
+app/metadata_prompt.py
 app/models.py
 app/parser.py
 contract_metadata_extractor.egg-info/PKG-INFO
