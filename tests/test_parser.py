@@ -45,6 +45,9 @@ def test_parser_returns_required_sections() -> None:
     assert result.clause_groups["Tax-related clauses"][0].code == "TAX001"
     assert result.clause_groups["Governing and dispute"][0].code == "GOV001"
     assert len(result.parties) >= 1
+    assert result.confidence_table
+    assert result.evidence_table
+    assert 0.0 <= result.overall_confidence <= 0.99
 
 
 def test_supplier_party_is_entity_name() -> None:
@@ -59,3 +62,20 @@ def test_supplier_party_is_entity_name() -> None:
     assert suppliers
     assert suppliers[0].name == "Beta Advisory Services Ltd"
     assert "agreement is entered" not in suppliers[0].name.lower()
+
+
+def test_parser_accepts_role_terms_from_metadata_prompt() -> None:
+    contract = """
+    FRAMEWORK AGREEMENT
+    Between Orion Procurement LLC (the Buyer) and Delta Engineering Ltd (the Partner).
+    """
+    metadata_prompt = """
+    supplier_role_terms = partner
+    buyer_role_terms = buyer
+    legal_entity_markers = llc,ltd
+    entity_stop_phrases = this agreement,shall
+    """
+    result = parse_contract(contract, metadata_prompt=metadata_prompt)
+    suppliers = [p for p in result.parties if p.role == "Supplier/Vendor"]
+    assert suppliers
+    assert suppliers[0].name == "Delta Engineering Ltd"

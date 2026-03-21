@@ -26,4 +26,7 @@ def test_extract_from_text_upload() -> None:
     data = response.json()
     assert "contract_details" in data
     assert "clause_groups" in data
+    assert "confidence_table" in data
+    assert "evidence_table" in data
+    assert "overall_confidence" in data
     assert data["contract_details"]["effective_date"] != "NOT FOUND IN CONTRACT"

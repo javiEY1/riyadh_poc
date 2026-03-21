@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 NOT_FOUND = "NOT FOUND IN CONTRACT"
@@ -57,6 +57,22 @@ class ClauseExtraction(BaseModel):
     reference: str = NOT_FOUND
 
 
+class ConfidenceRow(BaseModel):
+    section: str
+    field: str
+    value: str
+    confidence_score: float
+    confidence_level: Literal["High", "Medium", "Low"]
+
+
+class EvidenceRow(BaseModel):
+    section: str
+    field: str
+    value: str
+    snippet: str
+    highlight_terms: List[str] = Field(default_factory=list)
+
+
 class ExtractionResult(BaseModel):
     contract_classification: ContractClassification
     parties: List[Party]
@@ -65,3 +81,6 @@ class ExtractionResult(BaseModel):
     nature_of_supply: NatureOfSupply
     clause_groups: Dict[str, List[ClauseExtraction]]
     ocr_used: bool = False
+    confidence_table: List[ConfidenceRow] = Field(default_factory=list)
+    evidence_table: List[EvidenceRow] = Field(default_factory=list)
+    overall_confidence: float = 0.0
