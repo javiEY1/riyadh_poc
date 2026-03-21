@@ -150,3 +150,19 @@ def test_template_upload_list_and_match() -> None:
     assert "similarity" in matches[0]
     assert "template_name" in matches[0]
     assert matches[0]["similarity"] > 0
+
+    compare_res = client.post(
+        f"/templates/{tpl_data['template_id']}/compare",
+        json=extracted,
+    )
+    assert compare_res.status_code == 200
+    diff = compare_res.json()
+    assert "overall_similarity" in diff
+    assert "fields" in diff
+    assert len(diff["fields"]) > 0
+    assert diff["template_name"] == "Advisory Template"
+    first_field = diff["fields"][0]
+    assert "contract_value" in first_field
+    assert "template_value" in first_field
+    assert "similarity" in first_field
+    assert "status" in first_field

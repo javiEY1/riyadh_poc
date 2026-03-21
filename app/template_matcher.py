@@ -81,6 +81,88 @@ def compute_similarity(contract_result: dict, template_result: dict) -> float:
     return round(total / len(all_keys), 4)
 
 
+FIELD_LABELS: dict[str, str] = {
+    "primary_type": "Primary Type",
+    "sub_type": "Sub Type",
+    "title": "Title",
+    "effective_date": "Effective Date",
+    "term_duration": "Term / Duration",
+    "renewal_provisions": "Renewal Provisions",
+    "estimated_value": "Estimated Value",
+    "payment_currency": "Payment Currency",
+    "language": "Language",
+    "expiration_date": "Expiration Date",
+    "supplier_jurisdiction": "Supplier Jurisdiction",
+    "buyer_jurisdiction": "Buyer Jurisdiction",
+    "service_delivery_locations": "Service Delivery Locations",
+    "description": "Nature of Supply",
+    "buyer_name": "Buyer Name",
+    "supplier_name": "Supplier Name",
+}
+
+SECTION_MAP: dict[str, str] = {
+    "primary_type": "Contract Classification",
+    "sub_type": "Contract Classification",
+    "title": "Contract Details",
+    "effective_date": "Contract Details",
+    "term_duration": "Contract Details",
+    "renewal_provisions": "Contract Details",
+    "estimated_value": "Contract Details",
+    "payment_currency": "Contract Details",
+    "language": "Contract Details",
+    "expiration_date": "Contract Details",
+    "supplier_jurisdiction": "Jurisdictions",
+    "buyer_jurisdiction": "Jurisdictions",
+    "service_delivery_locations": "Jurisdictions",
+    "description": "Nature of Supply",
+    "buyer_name": "Buyer",
+    "supplier_name": "Supplier",
+}
+
+
+def compare_detailed(
+    contract_result: dict,
+    template_result: dict,
+) -> dict:
+    c_vals = _extract_flat_values(contract_result)
+    t_vals = _extract_flat_values(template_result)
+    all_keys = sorted(set(c_vals.keys()) | set(t_vals.keys()))
+
+    rows: list[dict] = []
+    total_sim = 0.0
+    for key in all_keys:
+        c_val = c_vals.get(key, "")
+        t_val = t_vals.get(key, "")
+        sim = _field_similarity(c_val, t_val)
+        total_sim += sim
+
+        c_display = c_val if c_val else NOT_FOUND
+        t_display = t_val if t_val else NOT_FOUND
+
+        if key.startswith("clause_"):
+            label = key.replace("clause_", "").upper()
+            section = "Clauses"
+        else:
+            label = FIELD_LABELS.get(key, key.replace("_", " ").title())
+            section = SECTION_MAP.get(key, "Other")
+
+        status = "match" if sim == 1.0 else "differ" if sim > 0 else "missing"
+        if not c_val and not t_val:
+            status = "both_empty"
+
+        rows.append({
+            "section": section,
+            "field": label,
+            "contract_value": c_display,
+            "template_value": t_display,
+            "similarity": round(sim, 4),
+            "status": status,
+        })
+
+    overall = round(total_sim / len(all_keys), 4) if all_keys else 0.0
+    return {"overall_similarity": overall, "fields": rows}
+
+
 def rank_templates(
     contract_result: dict,
     templates: List[dict],

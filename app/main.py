@@ -17,7 +17,7 @@ from app.llm_parser import parse_contract_with_llm
 from app.metadata_prompt import load_metadata_prompt
 from app.models import ExtractionResult
 from app.parser import parse_contract
-from app.template_matcher import rank_templates
+from app.template_matcher import compare_detailed, rank_templates
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +192,21 @@ async def match_template(contract_result: dict) -> list[dict]:
         raise HTTPException(status_code=404, detail="No templates available")
 
     return rank_templates(contract_result, templates)
+
+
+@app.post("/templates/{tpl_id}/compare")
+async def compare_with_template(tpl_id: int, contract_result: dict) -> dict:
+    async with AsyncSessionLocal() as session:
+        tpl = await session.get(Template, tpl_id)
+        if not tpl:
+            raise HTTPException(status_code=404, detail="Template not found")
+
+    import json as _json
+    tpl_result = _json.loads(tpl.result_json) if isinstance(tpl.result_json, str) else tpl.result_json
+    diff = compare_detailed(contract_result, tpl_result)
+    diff["template_name"] = tpl.name
+    diff["template_id"] = tpl.id
+    return diff
 
 
 @app.post("/export")

@@ -332,6 +332,109 @@
         color: var(--ra-primary);
       }
       h3 { font-size: 1.1rem; color: var(--ra-primary); margin: 0 0 0.4rem; }
+
+      .history-list li.selected {
+        background: #f0ece7;
+        border-left: 3px solid var(--ra-primary);
+        padding-left: 0.5rem;
+      }
+
+      .compare-widget { margin-top: 0; }
+      .compare-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .compare-header h2 { margin: 0; }
+      .compare-overall {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--ra-border);
+      }
+      .compare-overall .overall-bar-bg {
+        flex: 1;
+        max-width: 200px;
+        height: 8px;
+        background: var(--ra-border);
+      }
+      .compare-overall .overall-bar-fill {
+        height: 100%;
+        background: var(--ra-primary);
+        transition: width 0.3s;
+      }
+      .compare-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+      .compare-table th {
+        background: transparent;
+        color: var(--ra-muted);
+        font-weight: 500;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 0.5rem 0.6rem;
+        border-bottom: 1px solid var(--ra-border);
+        text-align: left;
+      }
+      .compare-table td {
+        padding: 0.55rem 0.6rem;
+        border-bottom: 1px solid var(--ra-border);
+        vertical-align: top;
+      }
+      .compare-table .sec-header td {
+        background: #f0ece7;
+        font-weight: 600;
+        font-size: 0.82rem;
+        color: var(--ra-primary);
+        letter-spacing: 0.04em;
+        padding: 0.5rem 0.6rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      .compare-table .sec-header:hover td { background: #e8e3dc; }
+      .compare-table .sec-header td::before {
+        content: "\25BC";
+        display: inline-block;
+        margin-right: 0.4rem;
+        font-size: 0.55rem;
+        transition: transform 0.2s;
+      }
+      .compare-table .sec-header.collapsed td::before { transform: rotate(-90deg); }
+      .compare-val-cell {
+        min-width: 140px;
+        max-width: 260px;
+        word-break: break-word;
+      }
+      .compare-status {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 0.3rem;
+        vertical-align: middle;
+      }
+      .compare-status.match { background: #3a7d44; }
+      .compare-status.differ { background: #c9952e; }
+      .compare-status.missing { background: #a0332e; }
+      .compare-status.both_empty { background: var(--ra-border); }
+      .compare-sim {
+        font-size: 0.82rem;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .compare-diff-highlight {
+        background: #fef3e0;
+        padding: 0.1rem 0.2rem;
+      }
+      .compare-match-val {
+        color: #3a7d44;
+      }
+      .compare-missing-val {
+        color: var(--ra-muted);
+        font-style: italic;
+      }
     </style>
   </head>
   <body>
@@ -416,7 +519,10 @@
       </section>
 
       <section class="card" id="templateDetailCard" style="display:none">
-        <h2>Template Detail: <span id="templateDetailName"></span></h2>
+        <div class="compare-header">
+          <h2>Template: <span id="templateDetailName"></span></h2>
+          <button id="closeTplDetail" type="button">Close</button>
+        </div>
         <div class="meta">
           <span class="pill" id="tplConfidence">Confidence: --</span>
           <span class="pill" id="tplMethod">Method: --</span>
@@ -429,7 +535,32 @@
             <tbody id="templateTableBody"></tbody>
           </table>
         </div>
-        <button id="closeTplDetail" type="button" style="margin-top:0.75rem">Close</button>
+      </section>
+
+      <section class="card compare-widget" id="compareCard" style="display:none">
+        <div class="compare-header">
+          <h2>Contract vs Template: <span id="compareTplName"></span></h2>
+          <button id="closeCompare" type="button">Close</button>
+        </div>
+        <div class="compare-overall">
+          <span style="font-size:0.88rem;font-weight:500;">Overall Similarity:</span>
+          <div class="overall-bar-bg"><div class="overall-bar-fill" id="compareOverallBar"></div></div>
+          <span id="compareOverallPct" style="font-weight:600;font-size:0.95rem;"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th style="width:22%">Field</th>
+                <th style="width:30%">Contract</th>
+                <th style="width:30%">Template</th>
+                <th style="width:8%">Sim</th>
+                <th style="width:10%">Status</th>
+              </tr>
+            </thead>
+            <tbody id="compareBody"></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="card">
@@ -689,7 +820,14 @@
       const tplConfidence = document.getElementById("tplConfidence");
       const tplMethod = document.getElementById("tplMethod");
       const closeTplDetail = document.getElementById("closeTplDetail");
+      const compareCard = document.getElementById("compareCard");
+      const compareTplName = document.getElementById("compareTplName");
+      const compareBody = document.getElementById("compareBody");
+      const compareOverallBar = document.getElementById("compareOverallBar");
+      const compareOverallPct = document.getElementById("compareOverallPct");
+      const closeCompare = document.getElementById("closeCompare");
       let hasTemplates = false;
+      let selectedTemplateId = null;
 
       async function loadTemplates() {
         try {
@@ -704,6 +842,7 @@
           }
           for (const tpl of tpls) {
             const li = document.createElement("li");
+            li.dataset.tplId = tpl.id;
             const date = tpl.uploaded_at ? new Date(tpl.uploaded_at).toLocaleString() : "";
             li.innerHTML = `
               <span class="hist-name">${escapeHtml(tpl.name)}</span>
@@ -712,10 +851,29 @@
                 <span>${escapeHtml(date)}</span>
               </span>
             `;
-            li.addEventListener("click", () => loadTemplateDetail(tpl.id));
+            li.addEventListener("click", () => toggleTemplateDetail(tpl.id, li));
             templateList.appendChild(li);
           }
+          highlightSelectedTemplate();
         } catch (_) { /* ignore */ }
+      }
+
+      function highlightSelectedTemplate() {
+        templateList.querySelectorAll("li").forEach(li => {
+          li.classList.toggle("selected", li.dataset.tplId == selectedTemplateId);
+        });
+      }
+
+      function toggleTemplateDetail(id, li) {
+        if (selectedTemplateId === id) {
+          selectedTemplateId = null;
+          templateDetailCard.style.display = "none";
+          highlightSelectedTemplate();
+          return;
+        }
+        selectedTemplateId = id;
+        highlightSelectedTemplate();
+        loadTemplateDetail(id);
       }
 
       async function loadTemplateDetail(id) {
@@ -737,7 +895,13 @@
       }
 
       closeTplDetail.addEventListener("click", () => {
+        selectedTemplateId = null;
         templateDetailCard.style.display = "none";
+        highlightSelectedTemplate();
+      });
+
+      closeCompare.addEventListener("click", () => {
+        compareCard.style.display = "none";
       });
 
       function renderTableInto(tbody, confRows, evidenceRows) {
@@ -844,6 +1008,7 @@
         if (!lastResult) return;
         matchResults.style.display = "none";
         matchBody.innerHTML = "";
+        compareCard.style.display = "none";
         try {
           const res = await fetch("/templates/match", {
             method: "POST",
@@ -859,7 +1024,7 @@
               <td>${escapeHtml(m.template_name)}</td>
               <td><span class="similarity-bar" style="width:${pct}px"></span>${pct}%</td>
             `;
-            tr.addEventListener("click", () => loadTemplateDetail(m.template_id));
+            tr.addEventListener("click", () => loadComparison(m.template_id));
             matchBody.appendChild(tr);
           }
           matchResults.style.display = "block";
@@ -868,6 +1033,79 @@
         }
       });
 
+      async function loadComparison(tplId) {
+        if (!lastResult) return;
+        compareCard.style.display = "none";
+        try {
+          const res = await fetch(`/templates/${tplId}/compare`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(lastResult),
+          });
+          const diff = await res.json();
+          if (!res.ok) throw new Error(diff.detail || "Compare failed");
+          renderComparison(diff);
+        } catch (e) {
+          errorEl.textContent = "Comparison error: " + e.message;
+        }
+      }
+
+      function renderComparison(diff) {
+        compareTplName.textContent = diff.template_name || "";
+        const overallPct = Math.round((diff.overall_similarity || 0) * 100);
+        compareOverallBar.style.width = overallPct + "%";
+        compareOverallPct.textContent = overallPct + "%";
+        compareBody.innerHTML = "";
+
+        const grouped = {};
+        for (const f of diff.fields || []) {
+          if (!grouped[f.section]) grouped[f.section] = [];
+          grouped[f.section].push(f);
+        }
+
+        for (const [section, fields] of Object.entries(grouped)) {
+          const secTr = document.createElement("tr");
+          secTr.className = "sec-header";
+          const secTd = document.createElement("td");
+          secTd.colSpan = 5;
+          secTd.textContent = section;
+          secTr.appendChild(secTd);
+          compareBody.appendChild(secTr);
+
+          const childRows = [];
+          for (const f of fields) {
+            const tr = document.createElement("tr");
+            const simPct = Math.round(f.similarity * 100);
+            const NOT_FOUND_STR = "NOT FOUND IN CONTRACT";
+
+            const cClass = f.contract_value === NOT_FOUND_STR ? "compare-missing-val" :
+                           f.status === "match" ? "compare-match-val" :
+                           f.status === "differ" ? "compare-diff-highlight" : "";
+            const tClass = f.template_value === NOT_FOUND_STR ? "compare-missing-val" :
+                           f.status === "match" ? "compare-match-val" :
+                           f.status === "differ" ? "compare-diff-highlight" : "";
+
+            tr.innerHTML = `
+              <td style="font-weight:500">${escapeHtml(f.field)}</td>
+              <td class="compare-val-cell"><span class="${cClass}">${escapeHtml(f.contract_value)}</span></td>
+              <td class="compare-val-cell"><span class="${tClass}">${escapeHtml(f.template_value)}</span></td>
+              <td class="compare-sim">${simPct}%</td>
+              <td><span class="compare-status ${f.status}"></span>${escapeHtml(f.status === "both_empty" ? "empty" : f.status)}</td>
+            `;
+            compareBody.appendChild(tr);
+            childRows.push(tr);
+          }
+
+          secTr.addEventListener("click", () => {
+            const collapsed = secTr.classList.toggle("collapsed");
+            childRows.forEach(r => r.classList.toggle("hidden-row", collapsed));
+          });
+        }
+
+        compareCard.style.display = "block";
+        compareCard.scrollIntoView({ behavior: "smooth" });
+      }
+
       btn.addEventListener("click", async () => {
         const file = fileInput.files[0];
         errorEl.textContent = "";
@@ -875,6 +1113,7 @@
         resultsCard.style.display = "none";
         matchResults.style.display = "none";
         matchBody.innerHTML = "";
+        compareCard.style.display = "none";
         overallConfidenceEl.textContent = "Overall confidence: --";
         ocrBadgeEl.textContent = "OCR used: --";
         methodBadgeEl.textContent = "Method: --";
