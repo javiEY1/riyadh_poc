@@ -339,25 +339,62 @@
         padding-left: 0.5rem;
       }
 
-      .compare-widget { margin-top: 0; }
+      .modal-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(30, 20, 40, 0.55);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+        justify-content: center;
+        align-items: flex-start;
+        padding: 3vh 1rem;
+        overflow-y: auto;
+      }
+      .modal-backdrop.open {
+        display: flex;
+      }
+      .modal-panel {
+        background: var(--ra-panel);
+        border: 1px solid var(--ra-border);
+        width: 100%;
+        max-width: 1060px;
+        padding: 2.25rem 2.5rem;
+        position: relative;
+        box-shadow: 0 20px 60px rgba(30, 20, 40, 0.25);
+        animation: modalIn 0.2s ease-out;
+      }
+      @keyframes modalIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
       .compare-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1rem;
+        margin-bottom: 1.25rem;
       }
       .compare-header h2 { margin: 0; }
+      .compare-close-btn {
+        background: transparent;
+        color: var(--ra-muted);
+        border: 1px solid var(--ra-border);
+        padding: 0.4rem 1rem;
+        font-size: 0.82rem;
+      }
+      .compare-close-btn:hover { background: var(--ra-bg); color: var(--ra-text); }
       .compare-overall {
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        margin-bottom: 1.25rem;
-        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.25rem;
         border-bottom: 1px solid var(--ra-border);
       }
       .compare-overall .overall-bar-bg {
         flex: 1;
-        max-width: 200px;
+        max-width: 220px;
         height: 8px;
         background: var(--ra-border);
       }
@@ -374,12 +411,15 @@
         font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.1em;
-        padding: 0.5rem 0.6rem;
+        padding: 0.55rem 0.65rem;
         border-bottom: 1px solid var(--ra-border);
         text-align: left;
+        position: sticky;
+        top: 0;
+        z-index: 1;
       }
       .compare-table td {
-        padding: 0.55rem 0.6rem;
+        padding: 0.55rem 0.65rem;
         border-bottom: 1px solid var(--ra-border);
         vertical-align: top;
       }
@@ -389,7 +429,7 @@
         font-size: 0.82rem;
         color: var(--ra-primary);
         letter-spacing: 0.04em;
-        padding: 0.5rem 0.6rem;
+        padding: 0.55rem 0.65rem;
         cursor: pointer;
         user-select: none;
       }
@@ -404,7 +444,7 @@
       .compare-table .sec-header.collapsed td::before { transform: rotate(-90deg); }
       .compare-val-cell {
         min-width: 140px;
-        max-width: 260px;
+        max-width: 280px;
         word-break: break-word;
       }
       .compare-status {
@@ -537,10 +577,21 @@
         </div>
       </section>
 
-      <section class="card compare-widget" id="compareCard" style="display:none">
+      <section class="card">
+        <details>
+          <summary>Document History</summary>
+          <ul class="history-list" id="historyList">
+            <li style="color:var(--ra-muted);cursor:default">No documents yet.</li>
+          </ul>
+        </details>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="compareModal">
+      <div class="modal-panel">
         <div class="compare-header">
           <h2>Contract vs Template: <span id="compareTplName"></span></h2>
-          <button id="closeCompare" type="button">Close</button>
+          <button class="compare-close-btn" id="closeCompare" type="button">Close</button>
         </div>
         <div class="compare-overall">
           <span style="font-size:0.88rem;font-weight:500;">Overall Similarity:</span>
@@ -561,16 +612,7 @@
             <tbody id="compareBody"></tbody>
           </table>
         </div>
-      </section>
-
-      <section class="card">
-        <details>
-          <summary>Document History</summary>
-          <ul class="history-list" id="historyList">
-            <li style="color:var(--ra-muted);cursor:default">No documents yet.</li>
-          </ul>
-        </details>
-      </section>
+      </div>
     </div>
 
     <script>
@@ -820,7 +862,7 @@
       const tplConfidence = document.getElementById("tplConfidence");
       const tplMethod = document.getElementById("tplMethod");
       const closeTplDetail = document.getElementById("closeTplDetail");
-      const compareCard = document.getElementById("compareCard");
+      const compareModal = document.getElementById("compareModal");
       const compareTplName = document.getElementById("compareTplName");
       const compareBody = document.getElementById("compareBody");
       const compareOverallBar = document.getElementById("compareOverallBar");
@@ -900,8 +942,23 @@
         highlightSelectedTemplate();
       });
 
-      closeCompare.addEventListener("click", () => {
-        compareCard.style.display = "none";
+      function openCompareModal() {
+        compareModal.classList.add("open");
+        document.body.style.overflow = "hidden";
+      }
+      function closeCompareModal() {
+        compareModal.classList.remove("open");
+        document.body.style.overflow = "";
+      }
+
+      closeCompare.addEventListener("click", closeCompareModal);
+
+      compareModal.addEventListener("click", (e) => {
+        if (e.target === compareModal) closeCompareModal();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && compareModal.classList.contains("open")) closeCompareModal();
       });
 
       function renderTableInto(tbody, confRows, evidenceRows) {
@@ -1008,7 +1065,7 @@
         if (!lastResult) return;
         matchResults.style.display = "none";
         matchBody.innerHTML = "";
-        compareCard.style.display = "none";
+        closeCompareModal();
         try {
           const res = await fetch("/templates/match", {
             method: "POST",
@@ -1035,7 +1092,7 @@
 
       async function loadComparison(tplId) {
         if (!lastResult) return;
-        compareCard.style.display = "none";
+        closeCompareModal();
         try {
           const res = await fetch(`/templates/${tplId}/compare`, {
             method: "POST",
@@ -1102,8 +1159,7 @@
           });
         }
 
-        compareCard.style.display = "block";
-        compareCard.scrollIntoView({ behavior: "smooth" });
+        openCompareModal();
       }
 
       btn.addEventListener("click", async () => {
@@ -1113,7 +1169,7 @@
         resultsCard.style.display = "none";
         matchResults.style.display = "none";
         matchBody.innerHTML = "";
-        compareCard.style.display = "none";
+        closeCompareModal();
         overallConfidenceEl.textContent = "Overall confidence: --";
         ocrBadgeEl.textContent = "OCR used: --";
         methodBadgeEl.textContent = "Method: --";
