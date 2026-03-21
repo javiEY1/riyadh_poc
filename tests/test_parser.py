@@ -45,3 +45,17 @@ def test_parser_returns_required_sections() -> None:
     assert result.clause_groups["Tax-related clauses"][0].code == "TAX001"
     assert result.clause_groups["Governing and dispute"][0].code == "GOV001"
     assert len(result.parties) >= 1
+
+
+def test_supplier_party_is_entity_name() -> None:
+    contract = """
+    CONSULTING AGREEMENT
+    This Agreement is entered into by and between Alpha Holdings LLC (the Buyer)
+    and Beta Advisory Services Ltd (the Supplier), effective date: 05 March 2026.
+    Supplier shall provide legal consulting services.
+    """
+    result = parse_contract(contract)
+    suppliers = [p for p in result.parties if p.role == "Supplier/Vendor"]
+    assert suppliers
+    assert suppliers[0].name == "Beta Advisory Services Ltd"
+    assert "agreement is entered" not in suppliers[0].name.lower()

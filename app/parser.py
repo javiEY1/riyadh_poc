@@ -256,37 +256,135 @@ def _extract_currency(text: str) -> str:
     return NOT_FOUND
 
 
+LEGAL_ENTITY_PATTERNS = [
+    r"\bllc\b",
+    r"\bl\.?l\.?c\.?\b",
+    r"\bltd\b",
+    r"\blimited\b",
+    r"\binc\.?\b",
+    r"\bcorp(?:oration)?\b",
+    r"\bcompany\b",
+    r"\bplc\b",
+    r"\bllp\b",
+    r"\blp\b",
+    r"\bpte\b",
+    r"\bpvt\b",
+    r"\bgmbh\b",
+    r"\bpjsc\b",
+    r"\bfzco\b",
+    r"\bfze\b",
+    r"\bag\b",
+    r"\bnv\b",
+    r"\bbv\b",
+]
+
+ENTITY_STOP_PHRASES = {
+    "this agreement",
+    "agreement is made",
+    "collectively",
+    "effective date",
+    "hereinafter",
+    "witnesseth",
+    "shall",
+}
+
+
+def _clean_party_name(raw: str) -> str:
+    name = re.sub(r"\s+", " ", raw).strip(" \n\t,.;:-\"'")
+    name = re.sub(r"^(?:and|between|by and between)\s+", "", name, flags=re.IGNORECASE)
+    name = re.sub(
+        r"\((?:the\s+)?(?:buyer|client|supplier|vendor|seller|contractor|service provider|provider|purchaser|licensor|licensee)\)",
+        "",
+        name,
+        flags=re.IGNORECASE,
+    )
+    name = re.sub(r"\s+(?:hereinafter(?:\s+referred\s+to)?\s+as)\b.*$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"\s*,?\s*(?:a|an)\s+(?:company|corporation|entity)\b.*$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"\s*,?\s*(?:organized|incorporated|registered)\b.*$", "", name, flags=re.IGNORECASE)
+    return name.strip(" ,.;:-")[:160]
+
+
+def _contains_legal_marker(name: str) -> bool:
+    return any(re.search(pattern, name, flags=re.IGNORECASE) for pattern in LEGAL_ENTITY_PATTERNS)
+
+
+def _is_probable_entity_name(name: str) -> bool:
+    if not name or len(name) < 3:
+        return False
+    lower = name.lower()
+    if any(phrase in lower for phrase in ENTITY_STOP_PHRASES):
+        return False
+
+    words = re.findall(r"[A-Za-z0-9&'.\-]+", name)
+    if len(words) < 2 or len(words) > 16:
+        return False
+
+    if _contains_legal_marker(name):
+        return True
+
+    capitalized = sum(1 for w in words if re.match(r"^[A-Z]", w))
+    has_action_verbs = bool(re.search(r"\b(?:shall|agree|agrees|provide|perform|deliver|entered)\b", lower))
+    return capitalized >= max(2, int(len(words) * 0.6)) and not has_action_verbs
+
+
+def _map_role(role_raw: str) -> str:
+    role = role_raw.strip().lower()
+    if role in {"buyer", "client", "purchaser", "licensee"}:
+        return "Buyer/Client"
+    if role in {
+        "supplier",
+        "vendor",
+        "seller",
+        "contractor",
+        "service provider",
+        "provider",
+        "licensor",
+    }:
+        return "Supplier/Vendor"
+    return "Other"
+
+
+def _add_party(parties: List[Party], raw_name: str, role: str) -> None:
+    name = _clean_party_name(raw_name)
+    if not _is_probable_entity_name(name):
+        return
+    if any(p.name.lower() == name.lower() and p.role == role for p in parties):
+        return
+    parties.append(Party(name=name, role=role, jurisdiction=_extract_country(name)))
+
+
 def _extract_parties(text: str) -> List[Party]:
     parties: List[Party] = []
-    intro = "\n".join(text.splitlines()[:120])
-    between_match = re.search(
-        r"between\s+(.+?)\s+and\s+(.+?)(?:\n|\.|$)",
-        intro,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-    if between_match:
-        first = re.sub(r"\s+", " ", between_match.group(1)).strip(" ,")
-        second = re.sub(r"\s+", " ", between_match.group(2)).strip(" ,")
-        if first:
-            parties.append(
-                Party(name=first[:160], role="Buyer/Client", jurisdiction=_extract_country(first))
-            )
-        if second:
-            parties.append(
-                Party(name=second[:160], role="Supplier/Vendor", jurisdiction=_extract_country(second))
-            )
+    intro = "\n".join(text.splitlines()[:180])
+
+    labeled_patterns = [
+        (r"(?:supplier|vendor|seller)\s*(?:name)?\s*[:\-]\s*([^\n;,]{3,200})", "Supplier/Vendor"),
+        (r"(?:buyer|client|purchaser)\s*(?:name)?\s*[:\-]\s*([^\n;,]{3,200})", "Buyer/Client"),
+    ]
+    for pattern, role in labeled_patterns:
+        for hit in re.finditer(pattern, intro, flags=re.IGNORECASE):
+            _add_party(parties, hit.group(1), role)
 
     role_hits = re.finditer(
-        r"([A-Z][A-Za-z0-9&.,'\-\s]{2,120})\s*\((?:the\s+)?(Buyer|Client|Supplier|Vendor|Seller)\)",
+        r"([A-Z][A-Za-z0-9&.,'\-\s]{2,180}?)\s*\((?:the\s+)?(Buyer|Client|Supplier|Vendor|Seller|Contractor|Service Provider|Provider|Purchaser|Licensor|Licensee)\)",
         intro,
         flags=re.IGNORECASE,
     )
     for hit in role_hits:
-        name = re.sub(r"\s+", " ", hit.group(1)).strip(" ,")
-        role_raw = hit.group(2).lower()
-        role = "Buyer/Client" if role_raw in {"buyer", "client"} else "Supplier/Vendor"
-        if name and all(p.name.lower() != name.lower() for p in parties):
-            parties.append(Party(name=name, role=role, jurisdiction=_extract_country(name)))
+        _add_party(parties, hit.group(1), _map_role(hit.group(2)))
+
+    flat_intro = re.sub(r"\s+", " ", intro)
+    for between_match in re.finditer(
+        r"between\s+(.{3,220}?)\s+and\s+(.{3,220}?)(?:\.|;|$)",
+        flat_intro,
+        flags=re.IGNORECASE,
+    ):
+        first = between_match.group(1)
+        second = between_match.group(2)
+        first_role = "Supplier/Vendor" if re.search(r"\b(supplier|vendor|seller|contractor)\b", first, re.IGNORECASE) else "Buyer/Client"
+        second_role = "Supplier/Vendor" if first_role == "Buyer/Client" else "Buyer/Client"
+        _add_party(parties, first, first_role)
+        _add_party(parties, second, second_role)
 
     return parties[:4]
 
