@@ -140,13 +140,6 @@
       .level-high { color: #0f7a42; font-weight: 600; }
       .level-medium { color: #9b6a05; font-weight: 600; }
       .level-low { color: #b00020; font-weight: 600; }
-      pre {
-        background: #120d1f;
-        color: #f4f2fb;
-        padding: 1rem;
-        border-radius: 10px;
-        overflow-x: auto;
-      }
       .evidence-row { cursor: pointer; }
       .evidence-row:hover { background: #f9f5ff; }
       .evidence-row td:first-child::before {
@@ -254,12 +247,6 @@
         </details>
       </section>
 
-      <section class="card">
-        <details>
-          <summary>Raw JSON output</summary>
-          <pre id="output"></pre>
-        </details>
-      </section>
     </div>
 
     <script>
@@ -267,7 +254,6 @@
       const fileInput = document.getElementById("fileInput");
       const statusEl = document.getElementById("status");
       const errorEl = document.getElementById("error");
-      const outputEl = document.getElementById("output");
       const tableBody = document.getElementById("tableBody");
       const overallConfidenceEl = document.getElementById("overallConfidence");
       const ocrBadgeEl = document.getElementById("ocrBadge");
@@ -420,7 +406,6 @@
       btn.addEventListener("click", async () => {
         const file = fileInput.files[0];
         errorEl.textContent = "";
-        outputEl.textContent = "";
         tableBody.innerHTML = "";
         evidenceBody.innerHTML = "";
         resultsCard.style.display = "none";
@@ -455,8 +440,6 @@
           resultsCard.style.display = "block";
           evidenceCard.style.display = "block";
           lastResult = data;
-
-          outputEl.textContent = JSON.stringify(data, null, 2);
           statusEl.textContent = "Analysis completed.";
         } catch (error) {
           statusEl.textContent = "";
