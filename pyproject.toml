@@ -11,7 +11,8 @@ dependencies = [
   "python-docx>=1.1.2",
   "pillow>=11.1.0",
   "pymupdf>=1.26.0",
-  "pytesseract>=0.3.13"
+  "pytesseract>=0.3.13",
+  "openpyxl>=3.1.5"
 ]
 
 [project.optional-dependencies]

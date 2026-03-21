@@ -6,19 +6,21 @@
     <title>Contract Analyzer</title>
     <style>
       :root {
-        --ra-bg-start: #1d103b;
-        --ra-bg-end: #4b2679;
-        --ra-accent: #b891ff;
-        --ra-accent-strong: #8f63e6;
+        --ra-bg-start: #180028;
+        --ra-bg-mid: #2a0a45;
+        --ra-bg-end: #4b1f73;
+        --ra-accent: #c8a4ff;
+        --ra-accent-strong: #9f71f0;
         --ra-panel: #ffffff;
-        --ra-text: #1f1d29;
-        --ra-muted: #666078;
+        --ra-text: #231b35;
+        --ra-muted: #6f6488;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-        background: linear-gradient(145deg, var(--ra-bg-start), var(--ra-bg-end));
+        background: radial-gradient(circle at 20% 10%, #5b2b8f 0%, transparent 40%),
+          linear-gradient(145deg, var(--ra-bg-start), var(--ra-bg-mid), var(--ra-bg-end));
         color: var(--ra-text);
       }
       .wrap {
@@ -35,14 +37,30 @@
       }
       .brand {
         color: #fff;
-        margin-bottom: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .brand-shell {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .brand-logo {
+        width: 70px;
+        height: 70px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        padding: 0.5rem;
+        backdrop-filter: blur(4px);
       }
       .brand small {
         display: block;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        opacity: 0.9;
+        opacity: 0.95;
         margin-bottom: 0.25rem;
+        color: var(--ra-accent);
       }
       .brand h1 {
         margin: 0;
@@ -50,7 +68,7 @@
       }
       .brand p {
         margin: 0.5rem 0 0;
-        opacity: 0.95;
+        opacity: 0.98;
       }
       .controls {
         display: flex;
@@ -80,12 +98,19 @@
         gap: 0.75rem;
         flex-wrap: wrap;
       }
+      .actions {
+        margin: 0.25rem 0 0.9rem;
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+      }
       .pill {
-        border: 1px solid #ddd;
+        border: 1px solid #decdf8;
         border-radius: 999px;
         padding: 0.35rem 0.7rem;
         font-size: 0.9rem;
-        color: #3b3252;
+        color: #3f2b63;
+        background: #fbf8ff;
       }
       .table-wrap { overflow-x: auto; }
       details summary {
@@ -127,9 +152,14 @@
   <body>
     <div class="wrap">
       <header class="brand">
-        <small>Riyadh Airlines</small>
-        <h1>Contract Analyzer</h1>
-        <p>Upload a contract and review extracted metadata, clauses, and confidence levels.</p>
+        <div class="brand-shell">
+          <img class="brand-logo" src="/static/riyadh-air-logo.svg" alt="Riyadh Air logo" />
+          <div>
+            <small>Riyadh Air</small>
+            <h1>Contract Analyzer</h1>
+            <p>Upload a contract and review extracted metadata, clauses, and confidence levels.</p>
+          </div>
+        </div>
       </header>
 
       <section class="card">
@@ -151,6 +181,10 @@
         <div class="meta">
           <span class="pill" id="overallConfidence">Overall confidence: --</span>
           <span class="pill" id="ocrBadge">OCR used: --</span>
+        </div>
+        <div class="actions">
+          <button id="exportExcelBtn" type="button">Export Excel</button>
+          <button id="exportJsonBtn" type="button">Export JSON</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -207,6 +241,9 @@
       const resultsCard = document.getElementById("resultsCard");
       const evidenceCard = document.getElementById("evidenceCard");
       const evidenceBody = document.getElementById("evidenceBody");
+      const exportExcelBtn = document.getElementById("exportExcelBtn");
+      const exportJsonBtn = document.getElementById("exportJsonBtn");
+      let lastResult = null;
 
       function escapeHtml(value) {
         return String(value)
@@ -279,6 +316,61 @@
         }
       }
 
+      function getFilenameFromResponse(response, fallback) {
+        const contentDisposition = response.headers.get("Content-Disposition") || "";
+        const match = contentDisposition.match(/filename=([^;]+)/i);
+        if (!match) return fallback;
+        return match[1].replace(/['"]/g, "").trim() || fallback;
+      }
+
+      async function exportResult(format) {
+        if (!lastResult) {
+          errorEl.textContent = "No extracted data available yet. Run analysis first.";
+          return;
+        }
+
+        errorEl.textContent = "";
+        const response = await fetch(`/export?format=${encodeURIComponent(format)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(lastResult),
+        });
+
+        if (!response.ok) {
+          const details = await response.text();
+          throw new Error(details || "Export failed");
+        }
+
+        const blob = await response.blob();
+        const fallback = format === "excel" ? "contract-analysis.xlsx" : "contract-analysis.json";
+        const filename = getFilenameFromResponse(response, fallback);
+
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      exportExcelBtn.addEventListener("click", async () => {
+        try {
+          await exportResult("excel");
+        } catch (error) {
+          errorEl.textContent = error.message;
+        }
+      });
+
+      exportJsonBtn.addEventListener("click", async () => {
+        try {
+          await exportResult("json");
+        } catch (error) {
+          errorEl.textContent = error.message;
+        }
+      });
+
       btn.addEventListener("click", async () => {
         const file = fileInput.files[0];
         errorEl.textContent = "";
@@ -289,6 +381,7 @@
         evidenceCard.style.display = "none";
         overallConfidenceEl.textContent = "Overall confidence: --";
         ocrBadgeEl.textContent = "OCR used: --";
+        lastResult = null;
 
         if (!file) {
           errorEl.textContent = "Please select a contract file.";
@@ -315,6 +408,7 @@
           ocrBadgeEl.textContent = `OCR used: ${data.ocr_used ? "Yes" : "No"}`;
           resultsCard.style.display = "block";
           evidenceCard.style.display = "block";
+          lastResult = data;
 
           outputEl.textContent = JSON.stringify(data, null, 2);
           statusEl.textContent = "Analysis completed.";
