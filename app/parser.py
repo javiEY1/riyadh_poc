@@ -581,8 +581,11 @@ def _add_party(
     name = _clean_party_name(raw_name)
     if not _is_probable_entity_name(name, config):
         return
-    if any(p.name.lower() == name.lower() and p.role == role for p in parties):
-        return
+    name_lower = name.lower()
+    for p in parties:
+        p_lower = p.name.lower()
+        if p.role == role and (p_lower == name_lower or name_lower in p_lower or p_lower in name_lower):
+            return
     if role == "Buyer/Client":
         addr_kw = config.buyer_address_keywords
         jur_kw = config.buyer_jurisdiction_keywords
@@ -617,26 +620,40 @@ def _extract_parties(text: str, config: ParserRuntimeConfig) -> List[Party]:
 
     role_terms = config.buyer_role_terms + config.supplier_role_terms
     role_terms_pattern = "|".join(re.escape(term) for term in sorted(role_terms, key=len, reverse=True))
-    role_hits = re.finditer(
-        rf"([A-Z][A-Za-z0-9&.,'\-\s]{{2,180}}?)\s*\((?:the\s+)?({role_terms_pattern})\)",
-        intro,
-        flags=re.IGNORECASE,
-    )
-    for hit in role_hits:
-        _add_party(parties, hit.group(1), _map_role(hit.group(2), config), config, full_text=text)
+    hereinafter_pat = rf'([A-Z][A-Za-z0-9&.,\'\- ]{{2,180}}?)\s*\((?:hereinafter\s+(?:referred\s+to\s+as\s+)?)?(?:the\s+)?["\u201c\u201d\'\\]*({role_terms_pattern})["\u201c\u201d\'\\]*\)'
+    for hit in re.finditer(hereinafter_pat, intro, flags=re.IGNORECASE):
+        raw = hit.group(1).strip()
+        raw = re.sub(r"^.*?\b(?:between|by and between|by|and)\s+", "", raw, flags=re.IGNORECASE).strip()
+        _add_party(parties, raw, _map_role(hit.group(2), config), config, full_text=text)
+
+    if len(parties) >= 2:
+        return parties[:4]
 
     flat_intro = re.sub(r"\s+", " ", intro)
+    all_role_terms = sorted(
+        config.supplier_role_terms + config.buyer_role_terms,
+        key=len, reverse=True,
+    )
+    role_alt = "|".join(re.escape(t) for t in all_role_terms)
     supplier_between_pattern = "|".join(re.escape(term) for term in config.supplier_role_terms)
-    for between_match in re.finditer(
-        r"between\s+(.{3,220}?)\s+and\s+(.{3,220}?)(?:\.|;|$)",
-        flat_intro,
-        flags=re.IGNORECASE,
-    ):
-        first = between_match.group(1)
-        second = between_match.group(2)
+
+    role_paren = r"(?:\s*\((?:the\s+)?[\"']?(?:" + role_alt + r")[\"']?\))?"
+    between_pat = (
+        r"between\s+"
+        r"([A-Z][A-Za-z0-9&.,'\-\s]{2,200}?)"
+        + role_paren +
+        r"\s+and\s+"
+        r"([A-Z][A-Za-z0-9&.,'\-\s]{2,200}?)"
+        + role_paren +
+        r"(?:\.|;|,|\s+(?:for|regarding|dated|effective|whereby|this|hereinafter)|\s*$)"
+    )
+    for between_match in re.finditer(between_pat, flat_intro, flags=re.IGNORECASE):
+        first = between_match.group(1).strip()
+        second = between_match.group(2).strip()
+        full_first = flat_intro[between_match.start(1):between_match.end(0)]
         first_role = (
             "Supplier/Vendor"
-            if re.search(rf"\b({supplier_between_pattern})\b", first, re.IGNORECASE)
+            if re.search(rf"\b({supplier_between_pattern})\b", full_first, re.IGNORECASE)
             else "Buyer/Client"
         )
         second_role = "Supplier/Vendor" if first_role == "Buyer/Client" else "Buyer/Client"
