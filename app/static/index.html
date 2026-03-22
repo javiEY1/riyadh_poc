@@ -1145,6 +1145,21 @@
             }
           });
         }
+
+        if (allL1.length > 0) {
+          const first = allL1[0];
+          first.l1Tr.classList.remove("collapsed");
+          first.l1Children.forEach(r => {
+            if (!r.classList.contains("snippet-row")) r.classList.remove("hidden-row");
+          });
+          first.l2Groups.forEach(g => {
+            g.l2Tr.classList.remove("collapsed");
+            g.l2Tr.classList.remove("hidden-row");
+            g.l2Children.forEach(r => {
+              if (!r.classList.contains("snippet-row")) r.classList.remove("hidden-row");
+            });
+          });
+        }
       }
 
       uploadTplBtn.addEventListener("click", async () => {
