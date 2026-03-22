@@ -340,6 +340,18 @@
       }
       h3 { font-size: 1.1rem; color: var(--ra-primary); margin: 0 0 0.4rem; }
 
+      .hist-delete {
+        background: transparent;
+        color: var(--ra-muted);
+        border: 1px solid var(--ra-border);
+        padding: 0.2rem 0.55rem;
+        font-size: 0.72rem;
+        letter-spacing: 0;
+        text-transform: none;
+        margin-left: 0.4rem;
+        flex-shrink: 0;
+      }
+      .hist-delete:hover { background: #a0332e; color: #fff; border-color: #a0332e; }
       .history-list li.selected {
         background: #f0ece7;
         border-left: 3px solid var(--ra-primary);
@@ -977,11 +989,34 @@
                 <span>${escapeHtml(date)}</span>
               </span>
             `;
+            const delBtn = document.createElement("button");
+            delBtn.className = "hist-delete";
+            delBtn.textContent = "Delete";
+            delBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              deleteTemplate(tpl.id, tpl.name);
+            });
+            li.appendChild(delBtn);
             li.addEventListener("click", () => toggleTemplateDetail(tpl.id, li));
             templateList.appendChild(li);
           }
           highlightSelectedTemplate();
         } catch (_) { /* ignore */ }
+      }
+
+      async function deleteTemplate(id, name) {
+        if (!confirm(`Delete template "${name}"?`)) return;
+        try {
+          const res = await fetch(`/templates/${id}`, { method: "DELETE" });
+          if (!res.ok) { const d = await res.json(); throw new Error(d.detail || "Delete failed"); }
+          if (selectedTemplateId === id) {
+            selectedTemplateId = null;
+            templateDetailCard.style.display = "none";
+          }
+          loadTemplates();
+        } catch (e) {
+          tplStatus.textContent = "Error: " + e.message;
+        }
       }
 
       function highlightSelectedTemplate() {

@@ -166,3 +166,10 @@ def test_template_upload_list_and_match() -> None:
     assert "template_value" in first_field
     assert "similarity" in first_field
     assert "status" in first_field
+
+    del_res = client.delete(f"/templates/{tpl_data['template_id']}")
+    assert del_res.status_code == 200
+    assert del_res.json() == {"deleted": tpl_data["template_id"]}
+
+    assert client.get(f"/templates/{tpl_data['template_id']}").status_code == 404
+    assert client.delete(f"/templates/{tpl_data['template_id']}").status_code == 404

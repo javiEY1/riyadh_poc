@@ -181,6 +181,17 @@ async def get_template(tpl_id: int) -> dict:
         return tpl.to_full()
 
 
+@app.delete("/templates/{tpl_id}")
+async def delete_template(tpl_id: int) -> dict:
+    async with AsyncSessionLocal() as session:
+        tpl = await session.get(Template, tpl_id)
+        if not tpl:
+            raise HTTPException(status_code=404, detail="Template not found")
+        await session.delete(tpl)
+        await session.commit()
+    return {"deleted": tpl_id}
+
+
 @app.post("/templates/match")
 async def match_template(contract_result: dict) -> list[dict]:
     async with AsyncSessionLocal() as session:
