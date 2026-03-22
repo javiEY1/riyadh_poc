@@ -81,6 +81,7 @@ async def extract_contract(file: UploadFile = File(...)) -> dict:
         )
 
     extraction_method = "regex"
+    llm_error = ""
     metadata_prompt = load_metadata_prompt()
 
     if _openai_api_key:
@@ -90,7 +91,8 @@ async def extract_contract(file: UploadFile = File(...)) -> dict:
                 metadata_prompt=metadata_prompt,
             )
             extraction_method = "llm"
-        except Exception:
+        except Exception as exc:
+            llm_error = str(exc)
             logger.exception("LLM extraction failed, falling back to regex parser")
             result = parse_contract(text, ocr_used=ocr_used, metadata_prompt=metadata_prompt)
     else:
@@ -100,6 +102,8 @@ async def extract_contract(file: UploadFile = File(...)) -> dict:
     response_data = result.model_dump()
     response_data["document_id"] = doc.id
     response_data["extraction_method"] = extraction_method
+    if llm_error:
+        response_data["llm_error"] = llm_error
     return response_data
 
 
@@ -141,6 +145,7 @@ async def upload_template(
 
     template_name = name.strip() or file.filename
     extraction_method = "regex"
+    llm_error = ""
     metadata_prompt = load_metadata_prompt()
 
     if _openai_api_key:
@@ -150,7 +155,8 @@ async def upload_template(
                 metadata_prompt=metadata_prompt,
             )
             extraction_method = "llm"
-        except Exception:
+        except Exception as exc:
+            llm_error = str(exc)
             logger.exception("LLM extraction failed for template, falling back to regex")
             result = parse_contract(text, ocr_used=ocr_used, metadata_prompt=metadata_prompt)
     else:
@@ -161,6 +167,8 @@ async def upload_template(
     response_data["template_id"] = tpl.id
     response_data["template_name"] = template_name
     response_data["extraction_method"] = extraction_method
+    if llm_error:
+        response_data["llm_error"] = llm_error
     return response_data
 
 

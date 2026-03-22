@@ -1464,6 +1464,9 @@
           methodBadgeEl.textContent = `Method: ${escapeHtml(data.extraction_method || "regex")}`;
           resultsCard.style.display = "block";
           lastResult = data;
+          if (data.llm_error) {
+            errorEl.textContent = `LLM failed (used regex fallback): ${data.llm_error}`;
+          }
           statusEl.textContent = "Analysis completed.";
           updateSearchBtn();
           loadHistory();
