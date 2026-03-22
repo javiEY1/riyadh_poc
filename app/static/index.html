@@ -38,7 +38,7 @@
       .wrap {
         max-width: 960px;
         margin: 0 auto;
-        padding: 3rem 1.5rem;
+        padding: 3.5rem 1.5rem 2rem;
       }
       .card {
         background: var(--ra-panel);
@@ -48,24 +48,31 @@
         margin-bottom: 1.5rem;
       }
       .brand {
-        margin-bottom: 2.5rem;
-        padding-bottom: 2rem;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 900;
+        background: var(--ra-panel);
         border-bottom: 1px solid var(--ra-border);
+        padding: 0.5rem 1.5rem;
       }
-      .brand-shell {
+      .brand-inner {
+        max-width: 960px;
+        margin: 0 auto;
         display: flex;
         align-items: center;
         position: relative;
-        min-height: 52px;
+        min-height: 28px;
       }
       .brand-logo {
-        height: 48px;
+        height: 26px;
         width: auto;
         flex-shrink: 0;
       }
       .brand h1 {
         margin: 0;
-        font-size: 2rem;
+        font-size: 1.05rem;
         color: var(--ra-primary);
         font-weight: 700;
         position: absolute;
@@ -73,14 +80,7 @@
         right: 0;
         text-align: center;
         pointer-events: none;
-      }
-      .brand p {
-        margin: 0.6rem 0 0;
-        text-align: center;
-        color: var(--ra-muted);
-        font-size: 0.95rem;
-        font-weight: 300;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.04em;
       }
       .controls {
         display: flex;
@@ -586,11 +586,10 @@
   <body>
     <div class="wrap">
       <header class="brand">
-        <div class="brand-shell">
+        <div class="brand-inner">
           <img class="brand-logo" src="/static/riyadh-air-logo.svg" alt="Riyadh Air logo" />
           <h1>Contract Analyzer</h1>
         </div>
-        <p>Upload a contract and review extracted metadata, clauses, and confidence levels.</p>
       </header>
 
       <section class="card">
