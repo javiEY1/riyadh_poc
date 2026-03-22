@@ -357,11 +357,17 @@
       }
       h3 { font-size: 1.1rem; color: var(--ra-primary); margin: 0 0 0.4rem; }
 
-      .btn-sm {
-        padding: 0.25rem 0.6rem;
-        font-size: 0.72rem;
-        margin-left: 0.4rem;
+      .btn-icon {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        font-size: 1.1rem;
+        line-height: 22px;
+        text-align: center;
         flex-shrink: 0;
+        margin-right: 0.5rem;
+        letter-spacing: 0;
+        text-transform: none;
       }
       .history-list li.selected {
         background: #f0ece7;
@@ -994,13 +1000,14 @@
               </span>
             `;
             const delBtn = document.createElement("button");
-            delBtn.className = "btn-sm btn-danger";
-            delBtn.textContent = "Delete";
+            delBtn.className = "btn-icon btn-danger";
+            delBtn.innerHTML = "&#8722;";
+            delBtn.title = "Delete template";
             delBtn.addEventListener("click", (e) => {
               e.stopPropagation();
               deleteTemplate(tpl.id, tpl.name);
             });
-            li.appendChild(delBtn);
+            li.prepend(delBtn);
             li.addEventListener("click", () => toggleTemplateDetail(tpl.id, li));
             templateList.appendChild(li);
           }
