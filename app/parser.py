@@ -377,7 +377,8 @@ class ParserRuntimeConfig:
 
 
 def _split_csv(value: str) -> List[str]:
-    return [item.strip().lower() for item in value.split(",") if item.strip()]
+    keywords_part = re.split(r"\.\s+[A-Z]", value, maxsplit=1)[0]
+    return [item.strip().lower() for item in keywords_part.split(",") if item.strip()]
 
 
 def _cfg_list(metadata_prompt: str | None, key: str, default: List[str]) -> List[str]:
