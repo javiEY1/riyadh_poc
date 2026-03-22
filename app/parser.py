@@ -500,6 +500,9 @@ def _clean_party_name(raw: str) -> str:
     name = re.sub(r"\s+(?:hereinafter(?:\s+referred\s+to)?\s+as)\b.*$", "", name, flags=re.IGNORECASE)
     name = re.sub(r"\s*,?\s*(?:a|an)\s+(?:company|corporation|entity)\b.*$", "", name, flags=re.IGNORECASE)
     name = re.sub(r"\s*,?\s*(?:organized|incorporated|registered)\b.*$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"\s*,?\s*(?:with\s+its|having\s+its|whose)\s+(?:registered|principal|head)\b.*$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"\s*,?\s*(?:P\.?O\.?\s*Box|PO\s*Box)\b.*$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"\s*,?\s*\d{1,5}\s+[A-Z][a-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Lane|Way|Place)\b.*$", "", name, flags=re.IGNORECASE)
     return name.strip(" ,.;:-")[:160]
 
 
@@ -600,17 +603,18 @@ def _add_party(
 def _extract_parties(text: str, config: ParserRuntimeConfig) -> List[Party]:
     parties: List[Party] = []
     intro = "\n".join(text.splitlines()[:180])
+    flat_intro = re.sub(r"\s+", " ", intro)
 
     supplier_terms_pattern = "|".join(re.escape(term) for term in config.supplier_role_terms)
     buyer_terms_pattern = "|".join(re.escape(term) for term in config.buyer_role_terms)
 
     labeled_patterns = [
         (
-            rf"(?:{supplier_terms_pattern})\s*(?:name)?\s*[:\-]\s*([^\n;,]{{3,200}})",
+            rf"(?:{supplier_terms_pattern})\s*(?:name)?\s*[:\-]\s*([^\n;]{{3,200}})",
             "Supplier/Vendor",
         ),
         (
-            rf"(?:{buyer_terms_pattern})\s*(?:name)?\s*[:\-]\s*([^\n;,]{{3,200}})",
+            rf"(?:{buyer_terms_pattern})\s*(?:name)?\s*[:\-]\s*([^\n;]{{3,200}})",
             "Buyer/Client",
         ),
     ]
@@ -620,16 +624,14 @@ def _extract_parties(text: str, config: ParserRuntimeConfig) -> List[Party]:
 
     role_terms = config.buyer_role_terms + config.supplier_role_terms
     role_terms_pattern = "|".join(re.escape(term) for term in sorted(role_terms, key=len, reverse=True))
-    hereinafter_pat = rf'([A-Z][A-Za-z0-9&.,\'\- ]{{2,180}}?)\s*\((?:hereinafter\s+(?:referred\s+to\s+as\s+)?)?(?:the\s+)?["\u201c\u201d\'\\]*({role_terms_pattern})["\u201c\u201d\'\\]*\)'
-    for hit in re.finditer(hereinafter_pat, intro, flags=re.IGNORECASE):
+    hereinafter_pat = rf'([A-Z][A-Za-z0-9&.,\'\- ]{{2,200}}?)\s*\((?:hereinafter\s+(?:referred\s+to\s+as\s+)?)?(?:the\s+)?["\u201c\u201d\'\\]*({role_terms_pattern})["\u201c\u201d\'\\]*\)'
+    for hit in re.finditer(hereinafter_pat, flat_intro, flags=re.IGNORECASE):
         raw = hit.group(1).strip()
         raw = re.sub(r"^.*?\b(?:between|by and between|by|and)\s+", "", raw, flags=re.IGNORECASE).strip()
         _add_party(parties, raw, _map_role(hit.group(2), config), config, full_text=text)
 
     if len(parties) >= 2:
         return parties[:4]
-
-    flat_intro = re.sub(r"\s+", " ", intro)
     all_role_terms = sorted(
         config.supplier_role_terms + config.buyer_role_terms,
         key=len, reverse=True,
