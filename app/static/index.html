@@ -1133,11 +1133,15 @@
             if (wasCollapsed) {
               l1Tr.classList.remove("collapsed");
               l1Children.forEach(r => {
-                if (r.classList.contains("group-l2") || (!r.classList.contains("evidence-row") && !r.classList.contains("snippet-row"))) {
-                  r.classList.remove("hidden-row");
-                }
+                if (!r.classList.contains("snippet-row")) r.classList.remove("hidden-row");
               });
-              l2Groups.forEach(g => g.l2Tr.classList.remove("hidden-row"));
+              l2Groups.forEach(g => {
+                g.l2Tr.classList.remove("collapsed");
+                g.l2Tr.classList.remove("hidden-row");
+                g.l2Children.forEach(r => {
+                  if (!r.classList.contains("snippet-row")) r.classList.remove("hidden-row");
+                });
+              });
             }
           });
         }
