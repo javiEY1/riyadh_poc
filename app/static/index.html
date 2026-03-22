@@ -94,20 +94,21 @@
         font-family: var(--font-body);
       }
       button {
-        background: var(--ra-primary);
-        color: #fff;
-        border: none;
+        background: transparent;
+        color: var(--ra-muted);
+        border: 1px solid var(--ra-border);
         border-radius: 0;
-        padding: 0.7rem 1.6rem;
+        padding: 0.5rem 1.2rem;
         cursor: pointer;
         font-family: var(--font-body);
         font-weight: 500;
-        font-size: 0.85rem;
-        letter-spacing: 0.08em;
+        font-size: 0.82rem;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
-        transition: background 0.2s;
+        transition: background 0.2s, color 0.2s, border-color 0.2s;
       }
-      button:hover { background: var(--ra-primary-light); }
+      button:hover { background: var(--ra-bg); color: var(--ra-text); }
+      .btn-danger:hover { background: #a0332e; color: #fff; border-color: #a0332e; }
       .status { color: var(--ra-muted); margin-top: 0.75rem; font-size: 0.9rem; }
       .error { color: #a0332e; white-space: pre-wrap; margin-top: 0.5rem; font-size: 0.9rem; }
       .meta {
@@ -340,18 +341,12 @@
       }
       h3 { font-size: 1.1rem; color: var(--ra-primary); margin: 0 0 0.4rem; }
 
-      .hist-delete {
-        background: transparent;
-        color: var(--ra-muted);
-        border: 1px solid var(--ra-border);
-        padding: 0.2rem 0.55rem;
+      .btn-sm {
+        padding: 0.25rem 0.6rem;
         font-size: 0.72rem;
-        letter-spacing: 0;
-        text-transform: none;
         margin-left: 0.4rem;
         flex-shrink: 0;
       }
-      .hist-delete:hover { background: #a0332e; color: #fff; border-color: #a0332e; }
       .history-list li.selected {
         background: #f0ece7;
         border-left: 3px solid var(--ra-primary);
@@ -395,14 +390,7 @@
         margin-bottom: 1.25rem;
       }
       .compare-header h2 { margin: 0; }
-      .compare-close-btn {
-        background: transparent;
-        color: var(--ra-muted);
-        border: 1px solid var(--ra-border);
-        padding: 0.4rem 1rem;
-        font-size: 0.82rem;
-      }
-      .compare-close-btn:hover { background: var(--ra-bg); color: var(--ra-text); }
+
       .compare-overall {
         display: flex;
         align-items: center;
@@ -687,7 +675,7 @@
       <div class="modal-panel">
         <div class="compare-header">
           <h2>Contract vs Template: <span id="compareTplName"></span></h2>
-          <button class="compare-close-btn" id="closeCompare" type="button">Close</button>
+          <button id="closeCompare" type="button">Close</button>
         </div>
         <div class="compare-overall">
           <span style="font-size:0.88rem;font-weight:500;">Overall Similarity:</span>
@@ -990,7 +978,7 @@
               </span>
             `;
             const delBtn = document.createElement("button");
-            delBtn.className = "hist-delete";
+            delBtn.className = "btn-sm btn-danger";
             delBtn.textContent = "Delete";
             delBtn.addEventListener("click", (e) => {
               e.stopPropagation();
