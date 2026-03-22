@@ -48,28 +48,35 @@
         margin-bottom: 1.5rem;
       }
       .brand {
-        text-align: center;
         margin-bottom: 2.5rem;
         padding-bottom: 2rem;
         border-bottom: 1px solid var(--ra-border);
       }
       .brand-shell {
         display: flex;
-        justify-content: center;
-        margin-bottom: 1.25rem;
+        align-items: center;
+        position: relative;
+        min-height: 52px;
       }
       .brand-logo {
-        height: 52px;
+        height: 48px;
         width: auto;
+        flex-shrink: 0;
       }
       .brand h1 {
         margin: 0;
-        font-size: 2.2rem;
+        font-size: 2rem;
         color: var(--ra-primary);
         font-weight: 700;
+        position: absolute;
+        left: 0;
+        right: 0;
+        text-align: center;
+        pointer-events: none;
       }
       .brand p {
         margin: 0.6rem 0 0;
+        text-align: center;
         color: var(--ra-muted);
         font-size: 0.95rem;
         font-weight: 300;
@@ -552,8 +559,8 @@
       <header class="brand">
         <div class="brand-shell">
           <img class="brand-logo" src="/static/riyadh-air-logo.svg" alt="Riyadh Air logo" />
+          <h1>Contract Analyzer</h1>
         </div>
-        <h1>Contract Analyzer</h1>
         <p>Upload a contract and review extracted metadata, clauses, and confidence levels.</p>
       </header>
 
