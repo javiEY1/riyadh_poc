@@ -22,7 +22,7 @@ class ContractClassification(BaseModel):
 
 class Party(BaseModel):
     name: str
-    role: Literal["Buyer/Client", "Supplier/Vendor", "Other"]
+    role: Literal["Buyer/Client", "Supplier/Vendor"]
     registered_address: str = NOT_FOUND
     jurisdiction: str = NOT_FOUND
 

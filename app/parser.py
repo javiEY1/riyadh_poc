@@ -323,7 +323,7 @@ def _extract_language(text: str) -> str:
         return "Arabic"
     if latin_chars:
         return "English"
-    return "Other"
+    return "Supplier/Vendor"
 
 
 def _extract_currency(text: str) -> str:
@@ -540,7 +540,7 @@ def _map_role(role_raw: str, config: ParserRuntimeConfig) -> str:
         return "Buyer/Client"
     if role in set(config.supplier_role_terms):
         return "Supplier/Vendor"
-    return "Other"
+    return "Supplier/Vendor"
 
 
 def _extract_address_near(text: str, entity_name: str, keywords: List[str]) -> str:
@@ -875,14 +875,9 @@ def _build_confidence_table(
     )
 
     for party in result.parties:
-        if party.role == "Buyer/Client":
-            party_section = "Buyer"
-        elif party.role == "Supplier/Vendor":
-            party_section = "Supplier"
-        else:
-            party_section = "Other Party"
+        party_section = "Buyer" if party.role == "Buyer/Client" else "Supplier"
         _add_conf_row(rows, party_section, "Name", party.name, _score_party_name(party.name, config))
-        _add_conf_row(rows, party_section, "Role", party.role, 0.95 if party.role != "Other" else 0.4)
+        _add_conf_row(rows, party_section, "Role", party.role, 0.95)
         _add_conf_row(
             rows,
             party_section,
@@ -1125,7 +1120,10 @@ def parse_contract(
 
     parties = _extract_parties(cleaned, runtime_config)
     if not parties:
-        parties = [Party(name=NOT_FOUND, role="Other")]
+        parties = [
+            Party(name=NOT_FOUND, role="Buyer/Client"),
+            Party(name=NOT_FOUND, role="Supplier/Vendor"),
+        ]
 
     gov_clause = clause_groups["Governing and dispute"][0].text
     supplier_jurisdiction = next(

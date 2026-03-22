@@ -47,8 +47,8 @@ def _extract_flat_values(result: dict) -> dict[str, str]:
     flat["description"] = str(nature.get("description", ""))
 
     for party in result.get("parties", []):
-        role = party.get("role", "Other")
-        prefix = "buyer" if role == "Buyer/Client" else "supplier" if role == "Supplier/Vendor" else "other"
+        role = party.get("role", "Supplier/Vendor")
+        prefix = "buyer" if role == "Buyer/Client" else "supplier"
         flat[f"{prefix}_name"] = str(party.get("name", ""))
         flat[f"{prefix}_jurisdiction"] = str(party.get("jurisdiction", ""))
 
@@ -183,7 +183,7 @@ def compare_detailed(
             t_text = t_clause_texts.get(key, "")
         else:
             label = FIELD_LABELS.get(key, key.replace("_", " ").title())
-            section = SECTION_MAP.get(key, "Other")
+            section = SECTION_MAP.get(key, "Contract Details")
 
         status = "match" if sim == 1.0 else "differ" if sim > 0 else "missing"
         if not c_val and not t_val:

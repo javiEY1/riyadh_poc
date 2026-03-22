@@ -35,7 +35,7 @@ Return a single JSON object (no markdown fences) with this exact structure:
   "parties": [
     {
       "name": "<legal entity name>",
-      "role": "<Buyer/Client or Supplier/Vendor or Other>",
+      "role": "<Buyer/Client or Supplier/Vendor>",
       "registered_address": "<address>",
       "jurisdiction": "<country>"
     }
@@ -136,9 +136,9 @@ def _parse_llm_json(raw: str) -> dict:
 def _build_parties(data: list) -> List[Party]:
     parties = []
     for p in data or []:
-        role = p.get("role", "Other")
-        if role not in ("Buyer/Client", "Supplier/Vendor", "Other"):
-            role = "Other"
+        role = p.get("role", "Supplier/Vendor")
+        if role not in ("Buyer/Client", "Supplier/Vendor"):
+            role = "Supplier/Vendor"
         parties.append(
             Party(
                 name=p.get("name", NOT_FOUND),
@@ -147,7 +147,10 @@ def _build_parties(data: list) -> List[Party]:
                 jurisdiction=p.get("jurisdiction", NOT_FOUND),
             )
         )
-    return parties or [Party(name=NOT_FOUND, role="Other")]
+    return parties or [
+        Party(name=NOT_FOUND, role="Buyer/Client"),
+        Party(name=NOT_FOUND, role="Supplier/Vendor"),
+    ]
 
 
 def _build_clauses(group_data: list) -> List[ClauseExtraction]:
@@ -221,12 +224,7 @@ def _build_confidence_from_llm(result: ExtractionResult) -> List[ConfidenceRow]:
     add("Contract Classification", "Sub Type", result.contract_classification.sub_type, 0.85)
 
     for party in result.parties:
-        if party.role == "Buyer/Client":
-            sec = "Buyer"
-        elif party.role == "Supplier/Vendor":
-            sec = "Supplier"
-        else:
-            sec = "Other Party"
+        sec = "Buyer" if party.role == "Buyer/Client" else "Supplier"
         add(sec, "Name", party.name, 0.92)
         add(sec, "Role", party.role, 0.95)
         add(sec, "Registered Address", party.registered_address, 0.85)
