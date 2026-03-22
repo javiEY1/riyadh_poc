@@ -1048,7 +1048,7 @@ _RATIONALE_MAP: Dict[str, Dict[str, str]] = {
     },
 }
 
-_CLAUSE_RATIONALE = "Detected by keyword matching ({keywords}) across contract sections. Text extracted from the matching paragraph."
+_CLAUSE_RATIONALE = "Detected by keyword matching ({keywords}) across contract sections. Clause text is extracted verbatim from the matching paragraph."
 
 
 def _get_rationale(section: str, field: str) -> str:

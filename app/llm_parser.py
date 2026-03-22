@@ -106,10 +106,11 @@ Return a single JSON object (no markdown fences) with this exact structure:
 }
 
 Rules:
-- Extract verbatim text from the contract for clause text fields.
+- CRITICAL: Clause text MUST be copied verbatim from the contract. Do NOT paraphrase, summarise or generate clause text. Copy-paste the exact words.
 - Party names must be legal entity names, not phrases.
-- For clause text, quote the relevant passage. Keep it under 500 chars.
+- For clause text, quote the exact passage as it appears in the document. Keep it under 500 chars.
 - For clause reference, provide the section number or heading.
+- If a clause is not found in the contract, set text to "NOT FOUND IN CONTRACT".
 - Return ONLY the JSON object, no explanation.
 """
 
@@ -168,6 +169,29 @@ def _build_clause_groups(data: dict) -> Dict[str, List[ClauseExtraction]]:
     for group_name, clauses_data in (data or {}).items():
         groups[group_name] = _build_clauses(clauses_data)
     return groups
+
+
+def _validate_clauses_verbatim(
+    clause_groups: Dict[str, List[ClauseExtraction]],
+    source_text: str,
+) -> None:
+    """Discard clause text that cannot be found in the source document."""
+    haystack = re.sub(r"\s+", " ", source_text.lower())
+    for clauses in clause_groups.values():
+        for clause in clauses:
+            if clause.text == NOT_FOUND or not clause.text:
+                continue
+            probe = re.sub(r"\s+", " ", clause.text.strip().lower())
+            # Try full text, then progressively shorter prefixes
+            found = False
+            for length in (len(probe), min(120, len(probe)), min(60, len(probe))):
+                if length < 15:
+                    break
+                if probe[:length] in haystack:
+                    found = True
+                    break
+            if not found:
+                clause.text = NOT_FOUND
 
 
 def _confidence_level(score: float) -> str:
@@ -392,6 +416,8 @@ async def parse_contract_with_llm(
         clause_groups=_build_clause_groups(_safe_get(data, "clause_groups", default={})),
         ocr_used=ocr_used,
     )
+
+    _validate_clauses_verbatim(result.clause_groups, text)
 
     conf_table = _build_confidence_from_llm(result)
     result.confidence_table = conf_table
