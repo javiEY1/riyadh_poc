@@ -449,6 +449,13 @@
         transition: transform 0.2s;
       }
       .compare-table .sec-header.collapsed td::before { transform: rotate(-90deg); }
+      .sec-accuracy {
+        float: right;
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        opacity: 0.85;
+      }
       .compare-val-cell {
         min-width: 140px;
         max-width: 280px;
@@ -1280,11 +1287,14 @@
 
         const allSections = [];
         for (const [section, fields] of Object.entries(grouped)) {
+          const secAvg = fields.reduce((sum, f) => sum + (f.similarity || 0), 0) / fields.length;
+          const secPct = Math.round(secAvg * 100);
+
           const secTr = document.createElement("tr");
-          secTr.className = "sec-header collapsed";
+          secTr.className = "sec-header";
           const secTd = document.createElement("td");
           secTd.colSpan = 5;
-          secTd.textContent = section;
+          secTd.innerHTML = `${escapeHtml(section)}<span class="sec-accuracy">${secPct}% accuracy</span>`;
           secTr.appendChild(secTd);
           compareBody.appendChild(secTr);
 
@@ -1292,7 +1302,7 @@
           for (const f of fields) {
             const tr = document.createElement("tr");
             const expandable = hasDetailContent(f);
-            tr.className = (expandable ? "compare-data-row" : "") + " hidden-row";
+            tr.className = expandable ? "compare-data-row" : "";
             const simPct = Math.round(f.similarity * 100);
             const NOT_FOUND_STR = "NOT FOUND IN CONTRACT";
 
