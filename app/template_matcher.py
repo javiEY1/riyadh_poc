@@ -82,15 +82,19 @@ def _build_evidence_index(result: dict) -> dict[str, dict]:
         idx[key] = {
             "snippet": ev.get("snippet", ""),
             "highlight_terms": ev.get("highlight_terms", []),
+            "rationale": ev.get("rationale", ""),
         }
     return idx
 
 
 def _find_evidence(evidence_idx: dict, section: str, field: str) -> dict:
     ev = evidence_idx.get(f"{section}|||{field}")
-    if ev and ev.get("snippet") and ev["snippet"] != NOT_FOUND:
-        return ev
-    return {"snippet": "", "highlight_terms": []}
+    if ev:
+        has_snippet = ev.get("snippet") and ev["snippet"] != NOT_FOUND
+        has_rationale = bool(ev.get("rationale"))
+        if has_snippet or has_rationale:
+            return ev
+    return {"snippet": "", "highlight_terms": [], "rationale": ""}
 
 
 def compute_similarity(contract_result: dict, template_result: dict) -> float:
@@ -205,9 +209,13 @@ def compare_detailed(
         if c_ev["snippet"]:
             row["contract_snippet"] = c_ev["snippet"]
             row["contract_highlight"] = c_ev["highlight_terms"]
+        if c_ev.get("rationale"):
+            row["contract_rationale"] = c_ev["rationale"]
         if t_ev["snippet"]:
             row["template_snippet"] = t_ev["snippet"]
             row["template_highlight"] = t_ev["highlight_terms"]
+        if t_ev.get("rationale"):
+            row["template_rationale"] = t_ev["rationale"]
 
         rows.append(row)
 

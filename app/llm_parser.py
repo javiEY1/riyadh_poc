@@ -266,6 +266,8 @@ def _find_snippet(text: str, value: str, window: int = 120) -> str:
 def _build_evidence_from_llm(
     text: str, conf_rows: List[ConfidenceRow],
 ) -> List[EvidenceRow]:
+    from app.parser import _get_rationale
+
     evidence: List[EvidenceRow] = []
     for row in conf_rows:
         snippet = _find_snippet(text, row.value)
@@ -275,6 +277,11 @@ def _build_evidence_from_llm(
             terms = [t[:80] for t in raw if len(t) <= 200][:4]
             if not terms:
                 terms = [row.value[:80]]
+        rationale = ""
+        if row.value != NOT_FOUND:
+            rationale = _get_rationale(row.section, row.field)
+            if not rationale.startswith("Detected by keyword"):
+                rationale = "LLM-extracted. " + rationale
         evidence.append(
             EvidenceRow(
                 section=row.section,
@@ -282,6 +289,7 @@ def _build_evidence_from_llm(
                 value=row.value,
                 snippet=snippet,
                 highlight_terms=terms,
+                rationale=rationale,
             )
         )
     return evidence

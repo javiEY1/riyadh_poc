@@ -71,6 +71,7 @@ class EvidenceRow(BaseModel):
     value: str
     snippet: str
     highlight_terms: List[str] = Field(default_factory=list)
+    rationale: str = ""
 
 
 class ExtractionResult(BaseModel):

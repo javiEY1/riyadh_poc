@@ -1009,6 +1009,63 @@ def _find_snippet_for_value(text: str, value: str, window: int = 120) -> str:
     return NOT_FOUND
 
 
+_RATIONALE_MAP: Dict[str, Dict[str, str]] = {
+    "Contract Classification": {
+        "Primary Type": "Classified by keyword analysis of service, goods, fuel, SaaS, and advisory terms across the contract text.",
+        "Sub Type": "Derived from secondary keyword patterns (consultancy, maintenance, licensing, supply) in contract body.",
+    },
+    "Buyer": {
+        "Name": "Identified using legal entity markers (Ltd, LLC, Inc, etc.) and proximity to buyer/client role indicators.",
+        "Role": "Assigned based on contextual role terms (buyer, client, purchaser, customer) near the party name.",
+        "Registered Address": "Extracted from address patterns adjacent to the identified buyer entity name.",
+        "Jurisdiction": "Inferred from the party's registered address or the governing law clause when not explicitly stated.",
+    },
+    "Supplier": {
+        "Name": "Identified using legal entity markers (Ltd, LLC, Inc, etc.) and proximity to supplier/vendor role indicators.",
+        "Role": "Assigned based on contextual role terms (supplier, vendor, provider, contractor) near the party name.",
+        "Registered Address": "Extracted from address patterns adjacent to the identified supplier entity name.",
+        "Jurisdiction": "Inferred from the party's registered address or the governing law clause when not explicitly stated.",
+    },
+    "Jurisdictions": {
+        "Supplier Jurisdiction": "Derived from the supplier's registered address or inferred from the governing law clause.",
+        "Buyer Jurisdiction": "Derived from the buyer's registered address or inferred from the governing law clause.",
+        "Service Delivery Locations": "Identified by matching known country names within service delivery and place-of-supply clauses.",
+    },
+    "Contract Details": {
+        "Title": "Extracted from the document heading, subject line, or first prominent text matching title patterns.",
+        "Effective Date": "Matched using date patterns (DD/MM/YYYY, Month DD YYYY) near keywords like 'effective', 'dated', 'commencement'.",
+        "Term Duration": "Extracted from clauses containing duration keywords (years, months, period, term).",
+        "Renewal Provisions": "Matched from renewal/extension clause keywords and adjacent text.",
+        "Estimated Value": "Extracted from monetary patterns (currency symbol + amount) near value/consideration/fee keywords.",
+        "Payment Currency": "Identified from currency codes (USD, SAR, EUR) or currency names in payment clauses.",
+        "Language": "Determined by character-set analysis of the contract text (Latin script = English, Arabic script = Arabic).",
+        "Expiration Date": "Matched using date patterns near expiry/expiration/end-date keywords, or calculated from effective date + term.",
+    },
+    "Nature of Supply": {
+        "Description": "Summarised from the scope-of-services clause or the first service description paragraph.",
+        "Verbatim Scope": "Extracted as the full text of the scope-of-services or statement-of-work section.",
+        "Scope Section Reference": "Taken from the section/clause number reference of the scope-of-services provision.",
+    },
+}
+
+_CLAUSE_RATIONALE = "Detected by keyword matching ({keywords}) across contract sections. Text extracted from the matching paragraph."
+
+
+def _get_rationale(section: str, field: str) -> str:
+    section_map = _RATIONALE_MAP.get(section)
+    if section_map:
+        rationale = section_map.get(field)
+        if rationale:
+            return rationale
+    if ":" in field:
+        code = field.split(":")[0].strip()
+        for _group_name, items in CLAUSE_DEFINITIONS.items():
+            for c_code, _title, keywords in items:
+                if c_code == code:
+                    return _CLAUSE_RATIONALE.format(keywords=", ".join(keywords[:3]))
+    return "Extracted using pattern matching and keyword analysis from the contract text."
+
+
 def _build_evidence_table(text: str, confidence_rows: List[ConfidenceRow]) -> List[EvidenceRow]:
     evidence_rows: List[EvidenceRow] = []
     for row in confidence_rows:
@@ -1021,6 +1078,8 @@ def _build_evidence_table(text: str, confidence_rows: List[ConfidenceRow]) -> Li
             if not highlight_terms:
                 highlight_terms = [value[:80]]
 
+        rationale = _get_rationale(row.section, row.field) if value != NOT_FOUND else ""
+
         evidence_rows.append(
             EvidenceRow(
                 section=row.section,
@@ -1028,6 +1087,7 @@ def _build_evidence_table(text: str, confidence_rows: List[ConfidenceRow]) -> Li
                 value=value,
                 snippet=snippet,
                 highlight_terms=highlight_terms,
+                rationale=rationale,
             )
         )
     return evidence_rows

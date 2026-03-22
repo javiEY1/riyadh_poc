@@ -233,6 +233,22 @@
         word-break: break-word;
         color: #4a4541;
       }
+      .rationale-box {
+        padding: 0.7rem 1rem;
+        font-size: 0.82rem;
+        line-height: 1.6;
+        color: var(--ra-muted);
+        font-style: italic;
+        border-left: 3px solid var(--ra-border);
+        background: #faf8f5;
+        margin-top: 0.4rem;
+      }
+      .rationale-box::before {
+        content: "Rationale: ";
+        font-weight: 600;
+        font-style: normal;
+        color: var(--ra-text);
+      }
       .snippet-box mark {
         background: #d6c9a8;
         color: #2c2420;
@@ -1133,6 +1149,11 @@
               snippetTd.colSpan = 4;
               if (ev && ev.snippet && ev.snippet !== "NOT FOUND IN CONTRACT") {
                 snippetTd.innerHTML = `<div class="snippet-box">${highlightSnippet(ev.snippet, ev.highlight_terms)}</div>`;
+                if (ev.rationale) {
+                  snippetTd.innerHTML += `<div class="rationale-box">${escapeHtml(ev.rationale)}</div>`;
+                }
+              } else if (ev && ev.rationale) {
+                snippetTd.innerHTML = `<div class="rationale-box">${escapeHtml(ev.rationale)}</div>`;
               } else {
                 snippetTd.innerHTML = `<div class="snippet-box" style="color:var(--ra-muted);font-style:italic">No matching snippet found.</div>`;
               }
@@ -1270,12 +1291,13 @@
         }
       }
 
-      function buildDetailPanel(label, clauseText, snippet, highlights) {
+      function buildDetailPanel(label, clauseText, snippet, highlights, rationale) {
         let html = `<div class="compare-detail-panel">`;
         html += `<div class="compare-detail-panel-label">${escapeHtml(label)}</div>`;
 
         const hasClause = clauseText && clauseText !== "NOT FOUND IN CONTRACT";
         const hasSnippet = snippet && snippet !== "NOT FOUND IN CONTRACT";
+        const hasRationale = rationale && rationale.length > 0;
 
         if (hasClause) {
           html += `<div class="compare-detail-text">${escapeHtml(clauseText)}</div>`;
@@ -1283,7 +1305,10 @@
         if (hasSnippet) {
           html += `<div class="compare-detail-snippet">${highlightSnippet(snippet, highlights || [])}</div>`;
         }
-        if (!hasClause && !hasSnippet) {
+        if (hasRationale) {
+          html += `<div class="rationale-box">${escapeHtml(rationale)}</div>`;
+        }
+        if (!hasClause && !hasSnippet && !hasRationale) {
           html += `<div class="compare-detail-empty">No extracted content available</div>`;
         }
         html += `</div>`;
@@ -1292,7 +1317,8 @@
 
       function hasDetailContent(f) {
         return f.contract_clause_text || f.template_clause_text ||
-               f.contract_snippet || f.template_snippet;
+               f.contract_snippet || f.template_snippet ||
+               f.contract_rationale || f.template_rationale;
       }
 
       function renderComparison(diff) {
@@ -1355,11 +1381,13 @@
                 + buildDetailPanel("Contract",
                     f.contract_clause_text || "",
                     f.contract_snippet || "",
-                    f.contract_highlight || [])
+                    f.contract_highlight || [],
+                    f.contract_rationale || "")
                 + buildDetailPanel("Template",
                     f.template_clause_text || "",
                     f.template_snippet || "",
-                    f.template_highlight || [])
+                    f.template_highlight || [],
+                    f.template_rationale || "")
                 + `</div>`;
               detailTr.appendChild(detailTd);
               compareBody.appendChild(detailTr);
