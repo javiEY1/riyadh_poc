@@ -18,6 +18,17 @@ def _ocr_available() -> bool:
         return False
 
 
+def _text_looks_valid(text: str, min_chars: int = 200) -> bool:
+    """Check if extracted text is substantial and not garbled."""
+    stripped = text.strip()
+    if len(stripped) < min_chars:
+        return False
+    alpha = sum(1 for c in stripped if c.isalpha())
+    if len(stripped) > 0 and alpha / len(stripped) < 0.3:
+        return False
+    return True
+
+
 def _extract_pdf_text(content: bytes) -> str:
     reader = PdfReader(BytesIO(content))
     parts: list[str] = []
@@ -48,7 +59,6 @@ def _extract_image_text(content: bytes) -> str:
 
 def extract_text(filename: str, content: bytes) -> tuple[str, bool]:
     suffix = Path(filename).suffix.lower()
-    ocr_used = False
 
     if suffix in {".txt", ".md"}:
         return content.decode("utf-8", errors="ignore"), False
@@ -58,12 +68,13 @@ def extract_text(filename: str, content: bytes) -> tuple[str, bool]:
 
     if suffix == ".pdf":
         text = _extract_pdf_text(content)
-        if len(text) >= 400:
+        if _text_looks_valid(text):
             return text, False
         if _ocr_available():
-            text = _extract_pdf_text_with_ocr(content)
-            ocr_used = True
-        return text, ocr_used
+            ocr_text = _extract_pdf_text_with_ocr(content)
+            if len(ocr_text.strip()) > len(text.strip()):
+                return ocr_text, True
+        return text, False
 
     if suffix in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}:
         if _ocr_available():
