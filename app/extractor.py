@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from io import BytesIO
 from pathlib import Path
 
@@ -8,6 +9,8 @@ import pytesseract
 from docx import Document
 from PIL import Image
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 
 def _ocr_available() -> bool:
@@ -18,15 +21,20 @@ def _ocr_available() -> bool:
         return False
 
 
-def _text_looks_valid(text: str, min_chars: int = 200) -> bool:
-    """Check if extracted text is substantial and not garbled."""
+def _text_quality(text: str) -> float:
+    """Return a quality score 0.0-1.0 for extracted text."""
     stripped = text.strip()
-    if len(stripped) < min_chars:
-        return False
+    if not stripped:
+        return 0.0
+    length = len(stripped)
     alpha = sum(1 for c in stripped if c.isalpha())
-    if len(stripped) > 0 and alpha / len(stripped) < 0.3:
-        return False
-    return True
+    ratio = alpha / length
+    words = stripped.split()
+    avg_word_len = sum(len(w) for w in words) / len(words) if words else 0
+    length_score = min(length / 500, 0.4)
+    alpha_score = 0.3 if ratio > 0.5 else 0.15 if ratio > 0.3 else 0.0
+    word_score = 0.3 if 3 < avg_word_len < 12 else 0.0
+    return min(length_score + alpha_score + word_score, 1.0)
 
 
 def _extract_pdf_text(content: bytes) -> str:
@@ -72,15 +80,19 @@ def extract_text(filename: str, content: bytes) -> tuple[str, bool]:
             text = _extract_pdf_text(content)
         except Exception:
             pass
-        if _text_looks_valid(text):
-            return text, False
-        if _ocr_available():
+        quality = _text_quality(text)
+        logger.info("PDF text extraction: %d chars, quality=%.2f", len(text), quality)
+        if _ocr_available() and quality < 0.9:
             try:
                 ocr_text = _extract_pdf_text_with_ocr(content)
-                if len(ocr_text.strip()) > len(text.strip()):
+                ocr_quality = _text_quality(ocr_text)
+                logger.info("OCR extraction: %d chars, quality=%.2f", len(ocr_text), ocr_quality)
+                if ocr_quality > quality or (quality < 0.7 and len(ocr_text) > len(text)):
                     return ocr_text, True
             except Exception:
-                pass
+                logger.exception("OCR extraction failed")
+        elif not _ocr_available() and quality < 0.5:
+            logger.warning("Tesseract OCR not available, skipping OCR")
         return text, False
 
     if suffix in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}:
