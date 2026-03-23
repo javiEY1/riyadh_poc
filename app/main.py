@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -23,10 +24,26 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+PROJECT_ROOT = BASE_DIR.parent
 
-_openai_api_key: str | None = None
-_azure_endpoint: str | None = None
-_azure_deployment: str | None = None
+
+def _load_env() -> None:
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_env()
+
+_openai_api_key: str | None = os.environ.get("AZURE_OPENAI_KEY") or None
+_azure_endpoint: str | None = os.environ.get("AZURE_OPENAI_ENDPOINT") or None
+_azure_deployment: str | None = os.environ.get("AZURE_OPENAI_DEPLOYMENT") or None
 
 
 @asynccontextmanager
