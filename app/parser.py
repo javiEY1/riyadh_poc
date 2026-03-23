@@ -1256,19 +1256,8 @@ def _rebuild_clause_rows(
 
             snippet = NOT_FOUND
             if clause.text != NOT_FOUND:
-                low = text.lower()
-                search = clause.text[:200].strip()
-                idx = low.find(search.lower())
-                if idx == -1:
-                    for word in search.split():
-                        if len(word) > 4:
-                            idx = low.find(word.lower())
-                            if idx != -1:
-                                break
-                if idx >= 0:
-                    start = max(0, idx - 80)
-                    end = min(len(text), idx + len(search) + 80)
-                    snippet = text[start:end].strip()
+                from app.llm_parser import _find_snippet
+                snippet = _find_snippet(text, clause.text, window=80)
             terms = clause.text.split()[:3] if clause.text != NOT_FOUND else []
             if key in ev_by_key:
                 ev_row = ev_by_key[key]

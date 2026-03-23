@@ -266,22 +266,33 @@ def _build_confidence_from_llm(result: ExtractionResult) -> List[ConfidenceRow]:
     return rows
 
 
-def _find_snippet(text: str, value: str, window: int = 120) -> str:
+def _find_snippet(text: str, value: str, window: int = 40) -> str:
     if not value or value == NOT_FOUND:
         return NOT_FOUND
-    search_val = value[:120].strip()
-    idx = text.lower().find(search_val.lower())
+    low = text.lower()
+    search_val = value.strip()
+    match_len = min(len(search_val), 200)
+    idx = low.find(search_val[:match_len].lower())
     if idx == -1:
         words = search_val.split()
-        for word in words:
-            if len(word) > 4:
-                idx = text.lower().find(word.lower())
+        for n in (6, 4, 3):
+            if len(words) >= n:
+                phrase = " ".join(words[:n]).lower()
+                idx = low.find(phrase)
                 if idx != -1:
+                    match_len = len(phrase)
                     break
+    if idx == -1:
+        significant = [w for w in search_val.split() if len(w) > 5]
+        for word in significant[:5]:
+            idx = low.find(word.lower())
+            if idx != -1:
+                match_len = len(word)
+                break
     if idx == -1:
         return NOT_FOUND
     start = max(0, idx - window)
-    end = min(len(text), idx + len(search_val) + window)
+    end = min(len(text), idx + match_len + window)
     return text[start:end].strip()
 
 
@@ -295,10 +306,14 @@ def _build_evidence_from_llm(
         snippet = _find_snippet(text, row.value)
         terms: List[str] = []
         if row.value != NOT_FOUND:
-            raw = [t.strip() for t in re.split(r",", row.value) if t.strip()]
-            terms = [t[:80] for t in raw if len(t) <= 200][:4]
-            if not terms:
-                terms = [row.value[:80]]
+            if len(row.value) > 100:
+                significant = [w for w in row.value.split() if len(w) > 4]
+                terms = significant[:4] if significant else [row.value[:40]]
+            else:
+                raw = [t.strip() for t in re.split(r",", row.value) if t.strip()]
+                terms = [t[:80] for t in raw if len(t) <= 200][:4]
+                if not terms:
+                    terms = [row.value[:80]]
         rationale = ""
         if row.value != NOT_FOUND:
             rationale = _get_rationale(row.section, row.field)
