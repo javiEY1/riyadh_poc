@@ -27,6 +27,9 @@ elif platform.system() == "Windows" and not shutil.which("tesseract"):
         r"C:\Users\{}\AppData\Local\Tesseract-OCR\tesseract.exe".format(
             os.environ.get("USERNAME", "")
         ),
+        r"C:\Users\{}\AppData\Local\Programs\Tesseract-OCR\tesseract.exe".format(
+            os.environ.get("USERNAME", "")
+        ),
     ]
     for _p in _win_paths:
         if os.path.isfile(_p):
