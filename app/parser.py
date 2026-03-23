@@ -249,11 +249,14 @@ def _clean_text(text: str) -> str:
     return text.strip()
 
 
-def _looks_like_heading(line: str) -> bool:
+def _is_major_heading(line: str) -> bool:
+    """Top-level section heading: '1. TITLE', 'ARTICLE 2', or ALL-CAPS short line."""
     line = line.strip()
     if len(line) < 3 or len(line) > 120:
         return False
-    if re.match(r"^\d+(\.\d+)*[\).\-\s]+[A-Za-z].+", line):
+    if re.match(r"^\d+[\).\-\s]+[A-Z][A-Z ]+", line):
+        return True
+    if re.match(r"^(?:article|section|clause|schedule|annex|exhibit)\s+\d+", line, re.IGNORECASE):
         return True
     words = line.split()
     if len(words) <= 10 and line.upper() == line and re.search(r"[A-Z]", line):
@@ -271,7 +274,7 @@ def _split_sections(text: str) -> List[Section]:
     for line in lines:
         if not line:
             continue
-        if _looks_like_heading(line):
+        if _is_major_heading(line):
             if buffer:
                 sections.append(Section(reference=cur_ref, title=cur_title, text="\n".join(buffer).strip()))
                 buffer = []
@@ -714,17 +717,32 @@ def _match_clause(sections: List[Section], keywords: List[str]) -> Tuple[str, st
         haystack = f"{section.title}\n{section.text}".lower()
         score = 0
         for keyword in keywords:
-            score += haystack.count(keyword.lower()) * (2 if keyword.lower() in section.title.lower() else 1)
+            kw = keyword.lower()
+            score += haystack.count(kw) * (3 if kw in section.title.lower() else 1)
         if score > best_score:
             best_score = score
             best_section = section
 
     if not best_section or best_score == 0:
         return NOT_FOUND, NOT_FOUND
-    excerpt = best_section.text.strip()
-    if len(excerpt) > 3000:
-        excerpt = excerpt[:3000].rsplit(" ", 1)[0] + " ..."
-    return excerpt or NOT_FOUND, best_section.reference
+
+    text_body = best_section.text.strip()
+    paragraphs = re.split(r"\n\s*\n|\n(?=\d+\.\d+[\s).])", text_body)
+    if len(paragraphs) > 1:
+        best_para = ""
+        best_para_score = -1
+        for para in paragraphs:
+            p_lower = para.lower()
+            ps = sum(p_lower.count(kw.lower()) for kw in keywords)
+            if ps > best_para_score:
+                best_para_score = ps
+                best_para = para.strip()
+        if best_para and best_para_score > 0:
+            text_body = best_para
+
+    if len(text_body) > 1500:
+        text_body = text_body[:1500].rsplit(" ", 1)[0] + " ..."
+    return text_body or NOT_FOUND, best_section.reference
 
 
 def _extract_clause_groups(
@@ -1196,6 +1214,15 @@ def backfill_clauses_with_regex(
     regex_clauses = _extract_clause_groups(sections, runtime_config)
 
     filled: set[str] = set()
+    def _norm_clause(t: str) -> str:
+        t = re.sub(r"^\d+(\.\d+)*[\s.)]+", "", t.strip())
+        return re.sub(r"\s+", " ", t.lower())
+
+    seen_texts: set[str] = set()
+    for clauses in result.clause_groups.values():
+        for c in clauses:
+            if c.text != NOT_FOUND:
+                seen_texts.add(_norm_clause(c.text))
 
     for group_name, llm_clauses in result.clause_groups.items():
         regex_group = regex_clauses.get(group_name, [])
@@ -1204,9 +1231,12 @@ def backfill_clauses_with_regex(
             if clause.text == NOT_FOUND:
                 regex_match = regex_by_code.get(clause.code)
                 if regex_match and regex_match.text != NOT_FOUND:
-                    clause.text = regex_match.text
-                    clause.reference = regex_match.reference
-                    filled.add(f"{group_name}|||{clause.code}: {clause.title}")
+                    norm = _norm_clause(regex_match.text)
+                    if norm not in seen_texts:
+                        clause.text = regex_match.text
+                        clause.reference = regex_match.reference
+                        seen_texts.add(norm)
+                        filled.add(f"{group_name}|||{clause.code}: {clause.title}")
 
     for group_name in regex_clauses:
         if group_name not in result.clause_groups:
