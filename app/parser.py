@@ -1195,6 +1195,8 @@ def backfill_clauses_with_regex(
     runtime_config = _build_runtime_config(metadata_prompt)
     regex_clauses = _extract_clause_groups(sections, runtime_config)
 
+    filled: set[str] = set()
+
     for group_name, llm_clauses in result.clause_groups.items():
         regex_group = regex_clauses.get(group_name, [])
         regex_by_code = {c.code: c for c in regex_group}
@@ -1204,9 +1206,78 @@ def backfill_clauses_with_regex(
                 if regex_match and regex_match.text != NOT_FOUND:
                     clause.text = regex_match.text
                     clause.reference = regex_match.reference
+                    filled.add(f"{group_name}|||{clause.code}: {clause.title}")
 
     for group_name in regex_clauses:
         if group_name not in result.clause_groups:
             result.clause_groups[group_name] = regex_clauses[group_name]
+            for c in regex_clauses[group_name]:
+                filled.add(f"{group_name}|||{c.code}: {c.title}")
+
+    if filled:
+        _rebuild_clause_rows(result, cleaned, filled)
 
     return result
+
+
+def _rebuild_clause_rows(
+    result: ExtractionResult, text: str, filled_keys: set[str],
+) -> None:
+    """Update confidence + evidence rows for backfilled clauses."""
+    conf_by_key = {f"{r.section}|||{r.field}": r for r in result.confidence_table}
+    ev_by_key = {f"{r.section}|||{r.field}": r for r in result.evidence_table}
+
+    for group_name, clauses in result.clause_groups.items():
+        for clause in clauses:
+            key = f"{group_name}|||{clause.code}: {clause.title}"
+            if key not in filled_keys:
+                continue
+            score = 0.72
+            if clause.text != NOT_FOUND:
+                score = 0.72 + (0.08 if clause.reference != NOT_FOUND else 0.0)
+                if len(clause.text) > 120:
+                    score += 0.06
+            level = "High" if score >= 0.75 else "Medium" if score >= 0.5 else "Low"
+            if key in conf_by_key:
+                row = conf_by_key[key]
+                row.value = clause.text
+                row.confidence_score = round(score, 2)
+                row.confidence_level = level
+            else:
+                result.confidence_table.append(
+                    ConfidenceRow(
+                        section=group_name,
+                        field=f"{clause.code}: {clause.title}",
+                        value=clause.text,
+                        confidence_score=round(score, 2),
+                        confidence_level=level,
+                    )
+                )
+
+            snippet = NOT_FOUND
+            if clause.text != NOT_FOUND:
+                search = clause.text[:120].strip()
+                idx = text.lower().find(search.lower())
+                if idx >= 0:
+                    start = max(0, idx - 80)
+                    end = min(len(text), idx + len(search) + 80)
+                    snippet = text[start:end].strip()
+            if key in ev_by_key:
+                ev_row = ev_by_key[key]
+                ev_row.snippet = snippet
+                ev_row.highlight_terms = clause.text.split()[:3] if clause.text != NOT_FOUND else []
+            else:
+                result.evidence_table.append(
+                    EvidenceRow(
+                        section=group_name,
+                        field=f"{clause.code}: {clause.title}",
+                        snippet=snippet,
+                        highlight_terms=clause.text.split()[:3] if clause.text != NOT_FOUND else [],
+                    )
+                )
+
+    total = len(result.confidence_table)
+    if total:
+        result.overall_confidence = round(
+            sum(r.confidence_score for r in result.confidence_table) / total, 2,
+        )
