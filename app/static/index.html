@@ -1492,6 +1492,10 @@
           lastResult = data;
           if (data.llm_error) {
             errorEl.textContent = `LLM failed (used regex fallback): ${data.llm_error}`;
+            errorEl.style.display = "block";
+          } else if (data.extraction_method === "regex") {
+            errorEl.textContent = "Note: LLM not configured — used regex extraction. Save your API key + Azure settings first.";
+            errorEl.style.display = "block";
           }
           statusEl.textContent = "Analysis completed.";
           updateSearchBtn();
