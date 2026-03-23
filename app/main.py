@@ -106,9 +106,17 @@ async def extract_contract(file: UploadFile = File(...)) -> dict:
 
     text, ocr_used = extract_text(file.filename, content)
     if not text.strip():
+        from app.extractor import _ocr_available
+        if not _ocr_available():
+            raise HTTPException(
+                status_code=422,
+                detail="Could not extract text. This file appears to be scanned but Tesseract OCR is not installed. "
+                "Run: sudo apt install tesseract-ocr (Linux) or brew install tesseract (macOS). "
+                "Or use the provided Dockerfile.",
+            )
         raise HTTPException(
             status_code=422,
-            detail="Could not extract text. If the file is scanned, install/configure Tesseract OCR.",
+            detail="Could not extract text from this file.",
         )
 
     extraction_method = "regex"
