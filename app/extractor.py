@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import platform
+import shutil
 from io import BytesIO
 from pathlib import Path
 
@@ -11,6 +14,25 @@ from PIL import Image
 from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
+
+# Allow explicit path via env var (useful on Windows)
+_tesseract_env = os.environ.get("TESSERACT_CMD", "")
+if _tesseract_env and os.path.isfile(_tesseract_env):
+    pytesseract.pytesseract.tesseract_cmd = _tesseract_env
+    logger.info("Tesseract configured from TESSERACT_CMD: %s", _tesseract_env)
+elif platform.system() == "Windows" and not shutil.which("tesseract"):
+    _win_paths = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        r"C:\Users\{}\AppData\Local\Tesseract-OCR\tesseract.exe".format(
+            os.environ.get("USERNAME", "")
+        ),
+    ]
+    for _p in _win_paths:
+        if os.path.isfile(_p):
+            pytesseract.pytesseract.tesseract_cmd = _p
+            logger.info("Tesseract found at %s", _p)
+            break
 
 
 def _ocr_available() -> bool:
@@ -80,19 +102,19 @@ def extract_text(filename: str, content: bytes) -> tuple[str, bool]:
             text = _extract_pdf_text(content)
         except Exception:
             pass
-        quality = _text_quality(text)
-        logger.info("PDF text extraction: %d chars, quality=%.2f", len(text), quality)
-        if _ocr_available() and quality < 0.9:
+        digital_quality = _text_quality(text)
+        logger.info("PDF digital text: %d chars, quality=%.2f", len(text), digital_quality)
+        if _ocr_available():
             try:
                 ocr_text = _extract_pdf_text_with_ocr(content)
                 ocr_quality = _text_quality(ocr_text)
-                logger.info("OCR extraction: %d chars, quality=%.2f", len(ocr_text), ocr_quality)
-                if ocr_quality > quality or (quality < 0.7 and len(ocr_text) > len(text)):
+                logger.info("PDF OCR text: %d chars, quality=%.2f", len(ocr_text), ocr_quality)
+                if ocr_quality > digital_quality:
+                    return ocr_text, True
+                if len(ocr_text.strip()) > len(text.strip()) * 1.5:
                     return ocr_text, True
             except Exception:
                 logger.exception("OCR extraction failed")
-        elif not _ocr_available() and quality < 0.5:
-            logger.warning("Tesseract OCR not available, skipping OCR")
         return text, False
 
     if suffix in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}:
