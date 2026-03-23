@@ -1182,3 +1182,31 @@ def parse_contract(
     result.evidence_table = _build_evidence_table(cleaned, confidence_table)
     result.overall_confidence = overall_confidence
     return result
+
+
+def backfill_clauses_with_regex(
+    result: ExtractionResult,
+    text: str,
+    metadata_prompt: str | None = None,
+) -> ExtractionResult:
+    """Fill NOT FOUND clauses in an LLM result using regex extraction."""
+    cleaned = _clean_text(text)
+    sections = _split_sections(cleaned)
+    runtime_config = _build_runtime_config(metadata_prompt)
+    regex_clauses = _extract_clause_groups(sections, runtime_config)
+
+    for group_name, llm_clauses in result.clause_groups.items():
+        regex_group = regex_clauses.get(group_name, [])
+        regex_by_code = {c.code: c for c in regex_group}
+        for clause in llm_clauses:
+            if clause.text == NOT_FOUND:
+                regex_match = regex_by_code.get(clause.code)
+                if regex_match and regex_match.text != NOT_FOUND:
+                    clause.text = regex_match.text
+                    clause.reference = regex_match.reference
+
+    for group_name in regex_clauses:
+        if group_name not in result.clause_groups:
+            result.clause_groups[group_name] = regex_clauses[group_name]
+
+    return result

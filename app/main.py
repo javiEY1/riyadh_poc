@@ -17,7 +17,7 @@ from app.exporter import build_excel_bytes, build_json_bytes
 from app.llm_parser import parse_contract_with_llm
 from app.metadata_prompt import load_metadata_prompt
 from app.models import ExtractionResult
-from app.parser import parse_contract
+from app.parser import backfill_clauses_with_regex, parse_contract
 from app.template_matcher import compare_detailed, rank_templates
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,7 @@ async def extract_contract(file: UploadFile = File(...)) -> dict:
                 azure_endpoint=_azure_endpoint,
                 azure_deployment=_azure_deployment,
             )
+            result = backfill_clauses_with_regex(result, text, metadata_prompt)
             extraction_method = "llm"
         except Exception as exc:
             llm_error = str(exc)
@@ -189,6 +190,7 @@ async def upload_template(
                 azure_endpoint=_azure_endpoint,
                 azure_deployment=_azure_deployment,
             )
+            result = backfill_clauses_with_regex(result, text, metadata_prompt)
             extraction_method = "llm"
         except Exception as exc:
             llm_error = str(exc)
