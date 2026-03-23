@@ -25,6 +25,8 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
 _openai_api_key: str | None = None
+_azure_endpoint: str | None = None
+_azure_deployment: str | None = None
 
 
 @asynccontextmanager
@@ -39,6 +41,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 class SettingsPayload(BaseModel):
     openai_api_key: str = ""
+    azure_endpoint: str = ""
+    azure_deployment: str = ""
 
 
 @app.get("/")
@@ -53,15 +57,25 @@ async def health() -> dict[str, str]:
 
 @app.post("/settings")
 async def update_settings(payload: SettingsPayload) -> dict:
-    global _openai_api_key  # noqa: PLW0603
+    global _openai_api_key, _azure_endpoint, _azure_deployment  # noqa: PLW0603
     key = payload.openai_api_key.strip()
     _openai_api_key = key if key else None
-    return {"llm_enabled": _openai_api_key is not None}
+    _azure_endpoint = payload.azure_endpoint.strip() or None
+    _azure_deployment = payload.azure_deployment.strip() or None
+    is_azure = bool(_openai_api_key and _azure_endpoint)
+    return {
+        "llm_enabled": _openai_api_key is not None,
+        "provider": "azure" if is_azure else "openai" if _openai_api_key else "none",
+    }
 
 
 @app.get("/settings")
 async def get_settings() -> dict:
-    return {"llm_enabled": _openai_api_key is not None}
+    is_azure = bool(_openai_api_key and _azure_endpoint)
+    return {
+        "llm_enabled": _openai_api_key is not None,
+        "provider": "azure" if is_azure else "openai" if _openai_api_key else "none",
+    }
 
 
 @app.post("/extract")
@@ -89,6 +103,8 @@ async def extract_contract(file: UploadFile = File(...)) -> dict:
             result = await parse_contract_with_llm(
                 text, api_key=_openai_api_key, ocr_used=ocr_used,
                 metadata_prompt=metadata_prompt,
+                azure_endpoint=_azure_endpoint,
+                azure_deployment=_azure_deployment,
             )
             extraction_method = "llm"
         except Exception as exc:
@@ -153,6 +169,8 @@ async def upload_template(
             result = await parse_contract_with_llm(
                 text, api_key=_openai_api_key, ocr_used=ocr_used,
                 metadata_prompt=metadata_prompt,
+                azure_endpoint=_azure_endpoint,
+                azure_deployment=_azure_deployment,
             )
             extraction_method = "llm"
         except Exception as exc:

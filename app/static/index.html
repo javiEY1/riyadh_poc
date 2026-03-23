@@ -594,11 +594,17 @@
 
       <section class="card">
         <div class="settings-row">
-          <label for="apiKeyInput">OpenAI API Key:</label>
-          <input type="password" id="apiKeyInput" placeholder="sk-..." />
+          <label for="apiKeyInput">API Key:</label>
+          <input type="password" id="apiKeyInput" placeholder="sk-... or Azure key" />
           <button id="saveKeyBtn" type="button">Save</button>
           <span class="status-dot off" id="llmDot" title="LLM status"></span>
           <span id="llmLabel" style="font-size:0.82rem;color:var(--ra-muted)">LLM off</span>
+        </div>
+        <div class="settings-row" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+          <label for="azureEndpointInput">Azure Endpoint:</label>
+          <input type="text" id="azureEndpointInput" placeholder="https://your-resource.openai.azure.com" style="flex:1;min-width:200px;padding:0.5rem 0.75rem;border:1px solid var(--ra-border);font-size:0.88rem;font-family:var(--font-body)" />
+          <label for="azureDeploymentInput" style="margin-left:0.4rem">Deployment:</label>
+          <input type="text" id="azureDeploymentInput" placeholder="gpt-4o-mini" style="width:140px;padding:0.5rem 0.75rem;border:1px solid var(--ra-border);font-size:0.88rem;font-family:var(--font-body)" />
         </div>
         <div class="controls">
           <input
@@ -736,29 +742,49 @@
       const llmDot = document.getElementById("llmDot");
       const llmLabel = document.getElementById("llmLabel");
       const historyList = document.getElementById("historyList");
+      const azureEndpointInput = document.getElementById("azureEndpointInput");
+      const azureDeploymentInput = document.getElementById("azureDeploymentInput");
       let lastResult = null;
 
-      function updateLlmStatus(enabled) {
+      function updateLlmStatus(data) {
+        const enabled = data.llm_enabled;
+        const provider = data.provider || "none";
         llmDot.className = `status-dot ${enabled ? "on" : "off"}`;
-        llmLabel.textContent = enabled ? "LLM active" : "LLM off (regex mode)";
+        if (!enabled) {
+          llmLabel.textContent = "LLM off (regex mode)";
+        } else if (provider === "azure") {
+          llmLabel.textContent = "Azure OpenAI active";
+        } else {
+          llmLabel.textContent = "OpenAI active";
+        }
+      }
+
+      function buildSettingsPayload() {
+        return {
+          openai_api_key: apiKeyInput.value.trim(),
+          azure_endpoint: azureEndpointInput.value.trim(),
+          azure_deployment: azureDeploymentInput.value.trim(),
+        };
       }
 
       (async () => {
         try {
           const stored = localStorage.getItem("openai_api_key");
+          const storedEndpoint = localStorage.getItem("azure_endpoint");
+          const storedDeployment = localStorage.getItem("azure_deployment");
           if (stored) {
             apiKeyInput.value = stored;
+            if (storedEndpoint) azureEndpointInput.value = storedEndpoint;
+            if (storedDeployment) azureDeploymentInput.value = storedDeployment;
             const res = await fetch("/settings", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ openai_api_key: stored }),
+              body: JSON.stringify(buildSettingsPayload()),
             });
-            const data = await res.json();
-            updateLlmStatus(data.llm_enabled);
+            updateLlmStatus(await res.json());
           } else {
             const res = await fetch("/settings");
-            const data = await res.json();
-            updateLlmStatus(data.llm_enabled);
+            updateLlmStatus(await res.json());
           }
         } catch (_) { /* ignore */ }
         loadHistory();
@@ -766,18 +792,18 @@
       })();
 
       saveKeyBtn.addEventListener("click", async () => {
-        const key = apiKeyInput.value.trim();
-        localStorage.setItem("openai_api_key", key);
+        localStorage.setItem("openai_api_key", apiKeyInput.value.trim());
+        localStorage.setItem("azure_endpoint", azureEndpointInput.value.trim());
+        localStorage.setItem("azure_deployment", azureDeploymentInput.value.trim());
         try {
           const res = await fetch("/settings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ openai_api_key: key }),
+            body: JSON.stringify(buildSettingsPayload()),
           });
-          const data = await res.json();
-          updateLlmStatus(data.llm_enabled);
+          updateLlmStatus(await res.json());
         } catch (e) {
-          errorEl.textContent = "Failed to save API key: " + e.message;
+          errorEl.textContent = "Failed to save settings: " + e.message;
         }
       });
 

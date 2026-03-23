@@ -343,17 +343,28 @@ async def parse_contract_with_llm(
     ocr_used: bool = False,
     model: str = "gpt-4o-mini",
     metadata_prompt: str | None = None,
+    azure_endpoint: str | None = None,
+    azure_deployment: str | None = None,
 ) -> ExtractionResult:
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI(api_key=api_key)
+    if azure_endpoint:
+        from openai import AsyncAzureOpenAI
+        client = AsyncAzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=azure_endpoint,
+            api_version="2024-06-01",
+        )
+        deploy = azure_deployment or model
+    else:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=api_key)
+        deploy = model
 
     truncated = text[:12000] if len(text) > 12000 else text
     field_hints = _build_field_hints(metadata_prompt)
     system_content = SYSTEM_PROMPT + field_hints
 
     response = await client.chat.completions.create(
-        model=model,
+        model=deploy,
         temperature=0.1,
         messages=[
             {"role": "system", "content": system_content},
