@@ -107,10 +107,18 @@ Return a single JSON object (no markdown fences) with this exact structure:
 
 Rules:
 - CRITICAL: Clause text MUST be copied verbatim from the contract. Do NOT paraphrase, summarise or generate clause text. Copy-paste the exact words.
+- CRITICAL: Each clause must contain text that SPECIFICALLY addresses its topic. For example:
+  * TAX002 (Tax clause) must contain text specifically about tax obligations or tax treatment.
+  * TAX003 (Withholding tax) must contain text specifically about withholding tax, not general tax text.
+  * TAX005 (Gross-up) must contain text specifically mentioning gross-up obligations, not general withholding text.
+  * PAY002 (Payment currency) must contain text specifically mentioning currency or exchange rates.
+  * GOV001 (Governing law) must contain text about governing law, not about disputes.
+  * GOV002 (Dispute resolution) must contain text about dispute resolution mechanisms, not governing law.
+- Do NOT reuse the same text passage for multiple clauses. Each clause must have its own unique, dedicated text.
+- If the contract does not contain text SPECIFICALLY dedicated to a clause's topic, set text to "NOT FOUND IN CONTRACT". It is better to return NOT FOUND than to assign unrelated text.
 - Party names must be legal entity names, not phrases.
 - For clause text, quote the exact passage as it appears in the document. Keep it under 500 chars.
 - For clause reference, provide the section number or heading.
-- If a clause is not found in the contract, set text to "NOT FOUND IN CONTRACT".
 - Return ONLY the JSON object, no explanation.
 """
 
@@ -178,14 +186,14 @@ def _validate_clauses_verbatim(
     clause_groups: Dict[str, List[ClauseExtraction]],
     source_text: str,
 ) -> None:
-    """Discard clause text that cannot be found in the source document."""
+    """Discard clause text not found in source and deduplicate identical text."""
     haystack = re.sub(r"\s+", " ", source_text.lower())
+    seen_texts: dict[str, str] = {}
     for clauses in clause_groups.values():
         for clause in clauses:
             if clause.text == NOT_FOUND or not clause.text:
                 continue
             probe = re.sub(r"\s+", " ", clause.text.strip().lower())
-            # Try full text, then progressively shorter prefixes
             found = False
             for length in (len(probe), min(120, len(probe)), min(60, len(probe))):
                 if length < 15:
@@ -195,6 +203,12 @@ def _validate_clauses_verbatim(
                     break
             if not found:
                 clause.text = NOT_FOUND
+                continue
+            if probe in seen_texts:
+                clause.text = NOT_FOUND
+                clause.reference = NOT_FOUND
+            else:
+                seen_texts[probe] = clause.code
 
 
 def _confidence_level(score: float) -> str:
