@@ -347,22 +347,15 @@ async def parse_contract_with_llm(
     azure_deployment: str | None = None,
 ) -> ExtractionResult:
     if azure_endpoint:
+        from openai import AsyncAzureOpenAI
         endpoint = azure_endpoint.rstrip("/")
-        if "/openai/v1" in endpoint:
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(
-                api_key=api_key,
-                base_url=endpoint,
-            )
-            deploy = azure_deployment or model
-        else:
-            from openai import AsyncAzureOpenAI
-            client = AsyncAzureOpenAI(
-                api_key=api_key,
-                azure_endpoint=endpoint,
-                api_version="2024-06-01",
-            )
-            deploy = azure_deployment or model
+        endpoint = endpoint.removesuffix("/openai/v1").removesuffix("/openai")
+        client = AsyncAzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=endpoint,
+            api_version="2024-06-01",
+        )
+        deploy = azure_deployment or model
     else:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key=api_key)
