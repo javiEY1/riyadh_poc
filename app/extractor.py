@@ -67,18 +67,28 @@ def extract_text(filename: str, content: bytes) -> tuple[str, bool]:
         return _extract_docx_text(content), False
 
     if suffix == ".pdf":
-        text = _extract_pdf_text(content)
+        text = ""
+        try:
+            text = _extract_pdf_text(content)
+        except Exception:
+            pass
         if _text_looks_valid(text):
             return text, False
         if _ocr_available():
-            ocr_text = _extract_pdf_text_with_ocr(content)
-            if len(ocr_text.strip()) > len(text.strip()):
-                return ocr_text, True
+            try:
+                ocr_text = _extract_pdf_text_with_ocr(content)
+                if len(ocr_text.strip()) > len(text.strip()):
+                    return ocr_text, True
+            except Exception:
+                pass
         return text, False
 
     if suffix in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}:
         if _ocr_available():
-            return _extract_image_text(content), True
+            try:
+                return _extract_image_text(content), True
+            except Exception:
+                pass
         return "", False
 
     return content.decode("utf-8", errors="ignore"), False
