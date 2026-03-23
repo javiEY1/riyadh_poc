@@ -561,6 +561,10 @@
       </header>
 
       <section class="card">
+        <p class="ocr-warning" id="ocrWarning" style="display:none;color:#a0332e;font-size:0.85rem;margin:0 0 0.75rem 0;padding:0.6rem 0.8rem;background:#fff0f0;border-left:3px solid #a0332e">
+          Tesseract OCR is not installed. Scanned PDFs and images cannot be processed.
+          Install: <code>sudo apt install tesseract-ocr</code> (Linux) · <code>brew install tesseract</code> (macOS)
+        </p>
         <div class="controls">
           <input
             class="file-input"
@@ -697,7 +701,11 @@
 
       (async () => {
         try {
-          /* no‑op – settings loaded from .env on server side */
+          const res = await fetch("/settings");
+          const settings = await res.json();
+          if (!settings.ocr_available) {
+            document.getElementById("ocrWarning").style.display = "block";
+          }
         } catch (_) { /* ignore */ }
         loadHistory();
         loadTemplates();

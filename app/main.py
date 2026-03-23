@@ -88,10 +88,12 @@ async def update_settings(payload: SettingsPayload) -> dict:
 
 @app.get("/settings")
 async def get_settings() -> dict:
+    from app.extractor import _ocr_available
     is_azure = bool(_openai_api_key and _azure_endpoint)
     return {
         "llm_enabled": _openai_api_key is not None,
         "provider": "azure" if is_azure else "openai" if _openai_api_key else "none",
+        "ocr_available": _ocr_available(),
     }
 
 
