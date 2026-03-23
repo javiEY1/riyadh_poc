@@ -341,7 +341,7 @@ async def parse_contract_with_llm(
     text: str,
     api_key: str,
     ocr_used: bool = False,
-    model: str = "gpt-4o-mini",
+    model: str = "gpt-4o",
     metadata_prompt: str | None = None,
     azure_endpoint: str | None = None,
     azure_deployment: str | None = None,
