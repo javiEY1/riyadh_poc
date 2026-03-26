@@ -20,6 +20,25 @@
         --font-heading: "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
         --font-body: "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
       }
+      html.dark {
+        --ra-primary: #b89cdb;
+        --ra-primary-light: #9b78c7;
+        --ra-bg: #1a1a2e;
+        --ra-panel: #222240;
+        --ra-text: #e0dce6;
+        --ra-muted: #8886a0;
+        --ra-border: #3a3852;
+        --ra-hover: #2a2a48;
+      }
+      html.dark mark {
+        background: #4a3870;
+        color: #e0dce6;
+      }
+      html.dark .error { color: #f08080; }
+      html.dark .ocr-warning { background: #3a2020; border-color: #f08080; color: #f08080; }
+      html.dark .btn-danger:hover { background: #c0443e; }
+      html.dark .brand { background: var(--ra-panel); border-color: var(--ra-border); }
+      html.dark .brand-logo { filter: brightness(3); }
       * { box-sizing: border-box; }
       body {
         margin: 0;
@@ -557,6 +576,7 @@
         <div class="brand-inner">
           <img class="brand-logo" src="/static/riyadh-air-logo.svg" alt="Riyadh Air logo" />
           <h1>Contract Analyzer</h1>
+          <button id="darkToggle" type="button" title="Toggle dark mode" style="position:absolute;right:0;background:transparent;border:1px solid var(--ra-border);padding:0.25rem 0.5rem;font-size:0.85rem;cursor:pointer;color:var(--ra-muted);line-height:1">&#9789;</button>
         </div>
       </header>
 
@@ -1405,6 +1425,18 @@
           statusEl.textContent = "";
           errorEl.textContent = error.message;
         }
+      });
+
+      /* Dark mode toggle */
+      const darkBtn = document.getElementById("darkToggle");
+      if (localStorage.getItem("theme") === "dark") {
+        document.documentElement.classList.add("dark");
+        darkBtn.textContent = "\u2600";
+      }
+      darkBtn.addEventListener("click", () => {
+        const isDark = document.documentElement.classList.toggle("dark");
+        localStorage.setItem("theme", isDark ? "dark" : "light");
+        darkBtn.textContent = isDark ? "\u2600" : "\u263D";
       });
     </script>
   </body>
